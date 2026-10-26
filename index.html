@@ -1019,9 +1019,10 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   const estokBox=(ox,oy,s,bb)=>({x:Math.min(ox,ox+bb[0]*s),y:oy-76*s,w:(Math.max(289,bb[0]+289)-Math.min(0,bb[0]))*s,h:(Math.max(142,bb[1]+200)+76)*s});
   const stack=(ox,oy,s,bb)=> price(ox,oy,()=> skin==='igu'? drawIguStack(ctx,A,item,ox,oy,s,dark,c.color,nz) : (drawClubStack(ctx,A,item,ox,oy,s,bb,dark,nz),estokBox(ox,oy,s,bb)));
   if(flex&&item.club){
-    const split=skin==='igu'&&(flex==='above'||flex==='below');
-    const W0=split?IGU_SPLIT.W:skin==='igu'?263:289, H0=split?IGU_SPLIT.H:skin==='igu'?378:423, pad=10, gap=8;
-    const put=(bx,by,sc)=>{ if(split) price(bx,by,()=>drawIguSplit(ctx,A,item,bx,by,sc,dark,c.color,nz)); else if(skin==='igu') stack(bx+3*sc,by+74*sc,sc); else stack(bx,by+76*sc,sc,[0,147]); };
+    // price above/below the photo: the two blocks side by side (name + normal price | club price), as in the PSDs
+    const split=flex==='above'||flex==='below';
+    const W0=split?(skin==='igu'?IGU_SPLIT.W:563.7):skin==='igu'?263:289, H0=split?(skin==='igu'?IGU_SPLIT.H:238.3):skin==='igu'?378:423, pad=10, gap=8;
+    const put=(bx,by,sc)=>{ if(split&&skin==='igu') price(bx,by,()=>drawIguSplit(ctx,A,item,bx,by,sc,dark,c.color,nz)); else if(split) stack(bx,by+76*sc,sc,[274.7,-37.7]); else if(skin==='igu') stack(bx+3*sc,by+74*sc,sc); else stack(bx,by+76*sc,sc,[0,147]); };
     if(flex==='left'||flex==='right'){
       const sc=Math.min(c.big?1:0.8,(c.h-2*pad)/H0,(c.w*0.56)/W0), sw=W0*sc, sx=flex==='left'?X+pad:X+c.w-pad-sw, sy=Y+(c.h-H0*sc)/2;
       fit(imgs,flex==='left'?{x:sx+sw+gap,y:Y+pad,w:X+c.w-pad-(sx+sw+gap),h:c.h-2*pad}:{x:X+pad,y:Y+pad,w:sx-gap-(X+pad),h:c.h-2*pad});
