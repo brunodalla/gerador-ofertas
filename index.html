@@ -724,6 +724,8 @@ function drawParagraph(ctx,text,{x,top,width,font,size,track=0,align='left',colo
 // product sold both by kg and by unit: "KG/" over "UND" in the small unit space
 function unitLines(u){ const m=/^\s*(KG|UND?|UNID)\s*\/\s*(KG|UND?|UNID)\s*$/i.exec(u||''); if(!m) return null; const f=x=>/KG/i.test(x)?'KG':'UND'; return [f(m[1])+'/',f(m[2])]; }
 function mixedUnit(raw){ const t=' '+String(raw||'').toUpperCase()+' '; const k=t.search(/[\s(]KG[\s).,]/), u=t.search(/[\s(](UN|UND|UNID|UNIDADE)[\s).,]/); if(k<0||u<0) return null; return k<u?'KG/UND':'UND/KG'; }
+function simplePriceW(ctx,item,k){ const p=fmtPrice(item.price||0); setFont(ctx,F_ANTON,125.46*k,10); const iw=ctx.measureText(p.int+'.').width; setFont(ctx,F_ANTON,42.1*k,10); const cw=ctx.measureText(p.cents).width;
+  const u=item.punit||item.unit||'UND', UL=unitLines(u); setFont(ctx,F_ANTON,(UL?19:(u.length>3?22:29.5))*k,10); const uw=Math.max(...(UL||[u]).map(t=>ctx.measureText(t).width)); return iw-24.8*k+Math.max(cw,uw)+4; }
 function fmtPrice(v){ const [i,c]=v.toFixed(2).split('.'); return {int:i,cents:c}; }
 
 // ---------- components ----------
@@ -1017,6 +1019,32 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   const tags=notes.filter(n=>/^\s*(EXCETO|LEVE|SOMENTE|APENAS)\b/i.test(n));
   const dy=Math.max(0,(c.h-441)/2);
   const estokBox=(ox,oy,s,bb)=>({x:Math.min(ox,ox+bb[0]*s),y:oy-76*s,w:(Math.max(289,bb[0]+289)-Math.min(0,bb[0]))*s,h:(Math.max(142,bb[1]+200)+76)*s});
+  // simple price with the description where the user chose (right / left / above / below the price);
+  // the block keeps the corner of the layout chosen (or automatic) and the photo takes the rest of the cell
+  const simpleFree=()=>{
+    const pos=item.namePos, k=c.big?(c.w>=900?1.3:1.15):(c.tall?1.15:1), pad=16;
+    const side=/Right$/.test(variant)?'right':/Below$/.test(variant)?'bottom':/Small2$/.test(variant)?'top':'left';
+    const lay=(x,top,draw)=>{ ctx.save(); if(!draw) ctx.globalAlpha=0;
+      const pw=simplePriceW(ctx,item,k), PH=(setFont(ctx,F_ANTON,125.46*k,10),ctx.measureText(fmtPrice(item.price||0).int).actualBoundingBoxAscent||92*k), sideW=Math.max(110,Math.min(230*k,c.w*0.36)), stackW=Math.max(pw,Math.min(230*k,c.w-2*pad));
+      let b;
+      if(pos==='side'||pos==='left'){ const nx=pos==='side'?x+pw+12:x, px=pos==='side'?x:x+sideW+12;
+        const r=drawSimplePrice(ctx,item.price,item.punit||item.unit,px,top+PH,k,ink);
+        const pr=para(item.name,{x:nx,top:top+4,width:sideW,font:F_MR,size:19.6*k,track:10,italic:0.2,maxLines:6,minSize:13,color:ink,align:pos==='left'?'right':'left'});
+        b={x,y:top,w:(pos==='side'?Math.max(pr.right,nx+20):r.right)-x,h:Math.max(PH,pr.bottom-top)+10}; }
+      else if(pos==='above'){ const pr=para(item.name,{x,top,width:stackW,font:F_MR,size:19.6*k,track:10,italic:0.2,maxLines:5,minSize:13,color:ink});
+        const t2=pr.bottom+12*k; const r=drawSimplePrice(ctx,item.price,item.punit||item.unit,x,t2+PH,k,ink); b={x,y:top,w:Math.max(r.right,pr.right)-x,h:t2+PH+6-top}; }
+      else { const r=drawSimplePrice(ctx,item.price,item.punit||item.unit,x,top+PH,k,ink);
+        const pr=para(item.name,{x:x+4,top:top+PH+24*k,width:Math.max(stackW,r.right-x),font:F_MR,size:19.6*k,track:10,italic:0.2,maxLines:5,minSize:13,color:ink});
+        b={x,y:top,w:Math.max(r.right,pr.right)-x,h:pr.bottom+8-top}; }
+      ctx.restore(); return b; };
+    const d=lay(X+pad,Y+pad,false);
+    const bx=side==='right'?X+c.w-pad-d.w:X+pad, by=side==='bottom'?Y+c.h-pad-d.h:Y+pad;
+    const IB=side==='left'?{x:bx+d.w+10,y:Y+10,w:X+c.w-10-(bx+d.w+10),h:c.h-20}:side==='right'?{x:X+10,y:Y+10,w:bx-10-(X+10),h:c.h-20}
+      :side==='top'?{x:X+10,y:by+d.h+8,w:c.w-20,h:Y+c.h-10-(by+d.h+8)}:{x:X+10,y:Y+10,w:c.w-20,h:by-8-(Y+10)};
+    if(IB.w>40&&IB.h>40) fit(imgs,IB); else fit(imgs,{x:X+10,y:Y+10,w:c.w-20,h:c.h-20});
+    price(bx,by,()=>lay(bx,by,true));
+    if(lim||tags.length){ const below=by+d.h+14, fits=side!=='bottom'&&below+118*0.8<Y+c.h; limGroup(fits?bx:X+c.w-10-199*0.62,fits?below:Y+10,fits?0.8:0.62); }
+  };
   const stack=(ox,oy,s,bb)=> price(ox,oy,()=> skin==='igu'? drawIguStack(ctx,A,item,ox,oy,s,dark,c.color,nz) : (drawClubStack(ctx,A,item,ox,oy,s,bb,dark,nz),estokBox(ox,oy,s,bb)));
   if(flex&&item.club){
     // price above/below the photo: the two blocks side by side (name + normal price | club price), as in the PSDs
@@ -1033,6 +1061,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
       fit(imgs,flex==='above'?{x:X+pad,y:sy+sh+gap,w:c.w-2*pad,h:Y+c.h-pad-(sy+sh+gap)}:{x:X+pad,y:Y+pad,w:c.w-2*pad,h:sy-gap-(Y+pad)});
       put(sx,sy,sc); limGroup(X+c.w-10-199*0.62,flex==='above'?Y+c.h-10-118*0.62*(1+tags.length*0.7):Y+10,0.62);
     }
+  } else if(!item.club&&item.namePos&&item.namePos!=='auto'){ simpleFree(); 
   } else if(flex){ // simple price: big Anton price with the name under it
     const k=c.big?1.15:1, BW=215*k, pad=12;
     const block=(left,base)=>price(left,base,()=>{ const r=drawSimplePrice(ctx,item.price,item.punit||item.unit,left,base,k,ink);
@@ -1421,11 +1450,12 @@ function procLayout(ctx,st,item,s){
   const pos=item.namePos&&item.namePos!=='auto'?item.namePos:(procLayout.auto||'side');
   const sideW=Math.max(rowW*0.8,F*1.25);
   const fwN=mtx(ctx,nameTxt,S.nFam,nS).w;
-  let lines=wrapW(ctx,nameTxt,S.nFam,nS,balancedW(fwN,nameTxt,pos==='side'?sideW:Math.max(rowW*(S.nWrap||1.15),F*(S.nWrap?1.1:1.6))));
+  let lines=wrapW(ctx,nameTxt,S.nFam,nS,balancedW(fwN,nameTxt,(pos==='side'||pos==='left')?sideW:Math.max(rowW*(S.nWrap||1.15),F*(S.nWrap?1.1:1.6))));
   if(pos==='side'&&lines.length>4&&!(item.namePos&&item.namePos!=='auto')) return procLayout(ctx,st,{...item,namePos:'below'},s);
   const nw=Math.max(0,...lines.map(l=>mtx(ctx,l,S.nFam,nS).w)), nh=lines.length*lh;
   let W,H,ry=0,rx=0,nx,ny,al='left';
   if(pos==='side'){ const gap=F*0.12; W=rowW+gap+nw; rx=0; nx=rowW+gap; ny=F*0.02; H=Math.max(cap+F*0.08,ny+nh); }
+  else if(pos==='left'){ const gap=F*0.12; W=nw+gap+rowW; rx=nw+gap; nx=nw; ny=F*0.02; al='right'; H=Math.max(cap+F*0.08,ny+nh); }
   else if(pos==='above'){ W=Math.max(rowW,nw); ny=0; ry=nh+F*0.1; rx=(W-rowW)/2; nx=W/2; al='center'; H=ry+cap+F*0.08; }
   else { W=Math.max(rowW,nw); rx=(W-rowW)/2; ny=cap+F*(S.bGap??0.16); nx=W/2; al='center'; H=ny+nh; }
   row(rx,ry,'ink');
@@ -2835,7 +2865,7 @@ function priceAdjUI(gi,it){
   const lab=el('span',{class:'adjv'},fmt());
   const rng=(k,min,max,step,val,t)=>fine(min,max,step,val,v=>set(k,v),t,/^(ps|ls|ns|s|a)$/.test(k));
   return el('div',{class:'adj'},el('b',{},'Preço:'),' tamanho ',rng('ps',0.4,2,0.02,a.ps||1,'Tamanho do preço'),' letra ',rng('ns',0.5,2,0.01,a.ns||1,'Tamanho da descrição deste produto'),' X ',rng('px',-700,700,2,a.px||0,'Mover o preço para os lados'),' Y ',rng('py',-900,900,2,a.py||0,'Mover o preço para cima/baixo'),lab,
-    tplOfGrid(S.grids[gi]).kind!=='replay'?null:el('select',{class:'gsel',title:'Onde fica a descrição do produto',onchange:e=>{ it.namePos=e.target.value; remember(it,{namePos:it.namePos}); renderSoon(gi); }},...[['auto','descrição: automático'],['side','descrição à direita'],...(it.club?[['left','descrição à esquerda']]:[]),['below','descrição embaixo'],['above','descrição em cima']].map(([v,t])=>el('option',{value:v,selected:(it.namePos||'auto')===v},t))),
+    (tplOfGrid(S.grids[gi]).kind!=='replay'&&it.club)?null:el('select',{class:'gsel',title:'Onde fica a descrição do produto',onchange:e=>{ it.namePos=e.target.value; remember(it,{namePos:it.namePos}); renderSoon(gi); }},...[['auto','descrição: automático'],['side','descrição à direita'],['left','descrição à esquerda'],['below','descrição embaixo'],['above','descrição em cima']].map(([v,t])=>el('option',{value:v,selected:(it.namePos||'auto')===v},t))),
     el('button',{class:'lnk',onclick:()=>{ if(it.adj){ delete it.adj.ps; delete it.adj.px; delete it.adj.py; } buildRows(gi); renderSoon(gi); }},'↺'));
 }
 function imgAdjUI(gi,it){
