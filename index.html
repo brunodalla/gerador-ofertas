@@ -782,27 +782,23 @@ function drawClubStack(ctx,A,it,ox,oy,s,bb,dark,nz=1){
 }
 // club price number filling its box: [R$][INT][cents over unit, the dot below them], centred in area A
 function drawClubNumber(ctx,value,unit,A,ink,R){
-  const p=fmtPrice(value||0), UL=unitLines(unit);
+  const p=fmtPrice(value||0), UL=unitLines(unit), U=UL||[unit];
   const m=(t,z)=>{ setFont(ctx,F_MBK,z,-30); const q=ctx.measureText(t); return {w:q.width,a:q.actualBoundingBoxAscent}; };
-  // two-line units ("KG/" over "UND", "CADA" over "100G") go beside the dot so they stay readable
-  const lay=(F,uk=1)=>{ const rs=m('R$',F*R.rs), I=m(p.int,F), C=m(p.cents,F*R.c), D=m('.',F), uz=F*R.u*(UL?1.05:1)*uk, Us=(UL||[unit]).map(t=>m(t,uz));
-    const uw=Math.max(...Us.map(u=>u.w)), colW=UL?Math.max(C.w,D.w*0.8+F*0.03+uw):Math.max(C.w,uw,D.w*1.1), g=F*0.035;
-    return {F,rs,I,C,D,Us,uz,uw,colW,g,W:rs.w+g+I.w+g*0.6+colW,H:I.a}; };
+  // cents on top, unit(s) under them, the dot below — two-line units ("KG/" over "UND") fit in the same column with a smaller dot
+  const dk=UL?0.62:1, ck=UL?0.88:1;
+  const lay=(F,uk=1)=>{ const rs=m('R$',F*R.rs), I=m(p.int,F), C=m(p.cents,F*R.c*ck), D=m('.',F*dk), uz=F*R.u*(UL?0.92:1)*uk, Us=U.map(t=>m(t,uz));
+    const colW=Math.max(C.w,...Us.map(u=>u.w),D.w*1.1), g=F*0.035; return {F,rs,I,C,D,Us,uz,colW,g,W:rs.w+g+I.w+g*0.6+colW,H:I.a}; };
   let L=lay(200); L=lay(Math.min(200*A.w/L.W,200*A.h/L.H));
-  const room=()=>{ const cb=L.C.a+L.F*0.06; if(UL) return L.H-cb-(L.Us[0].a+L.Us[1].a+L.uz*0.22); return L.H-L.D.a-L.F*0.04-cb-L.Us.reduce((a,u)=>a+u.a+L.uz*0.18,0); };
-  let uk=1; while(room()<0&&uk>0.5){ uk*=0.93; L=lay(L.F,uk); }
+  const room=()=>L.H-L.D.a-L.F*0.035-(L.C.a+L.F*0.05)-L.Us.reduce((a,u)=>a+u.a+L.uz*0.2,0);
+  let uk=1; while(room()<0&&uk>0.5){ uk*=0.95; L=lay(L.F,uk); }
   const x0=A.x+(A.w-L.W)/2, base=A.y+(A.h+L.H)/2, top=base-L.H;
   drawRuns(ctx,[{text:'R$',font:F_MBK,size:L.F*R.rs,track:-30}],x0,base,'left',ink);
   const ix=x0+L.rs.w+L.g; drawRuns(ctx,[{text:p.int,font:F_MBK,size:L.F,track:-30}],ix,base,'left',ink);
   const colX=ix+L.I.w+L.g*0.6, cx=colX+L.colW/2;
-  drawRuns(ctx,[{text:p.cents,font:F_MBK,size:L.F*R.c,track:-30}],cx,top+L.C.a,'center',ink);
-  if(UL){ const ux=colX+L.D.w*0.8+L.F*0.03+L.uw/2;
-    drawRuns(ctx,[{text:UL[1],font:F_MBK,size:L.uz,track:-30}],ux,base,'center',ink);
-    drawRuns(ctx,[{text:UL[0],font:F_MBK,size:L.uz,track:-30}],ux,base-L.Us[1].a-L.uz*0.22,'center',ink);
-    drawRuns(ctx,[{text:'.',font:F_MBK,size:L.F,track:0}],colX+L.D.w*0.4,base,'center',ink); return; }
-  let y=top+L.C.a+L.F*0.06;
-  for(let i=0;i<L.Us.length;i++){ y+=L.Us[i].a; drawRuns(ctx,[{text:unit,font:F_MBK,size:L.uz,track:-30}],cx,y,'center',ink); y+=L.uz*0.18; }
-  drawRuns(ctx,[{text:'.',font:F_MBK,size:L.F,track:0}],colX+L.D.w*0.45,base,'center',ink);
+  drawRuns(ctx,[{text:p.cents,font:F_MBK,size:L.F*R.c*ck,track:-30}],cx,top+L.C.a,'center',ink);
+  let y=top+L.C.a+L.F*0.05;
+  for(let i=0;i<U.length;i++){ y+=L.Us[i].a; drawRuns(ctx,[{text:U[i],font:F_MBK,size:L.uz,track:-30}],cx,y,'center',ink); y+=L.uz*0.2; }
+  drawRuns(ctx,[{text:'.',font:F_MBK,size:L.F*dk,track:0}],colX+L.D.w*0.45,base,'center',ink);
 }
 function drawClubPrice(ctx,value,unit,bx,by,s){
   drawClubNumber(ctx,value,unit,{x:bx+s*22,y:by+s*82,w:s*243,h:s*102},'#fff',{rs:0.267,c:0.33,u:0.19});
