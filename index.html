@@ -811,10 +811,22 @@ function drawSimplePrice(ctx,value,unit,left,base,k=1,ink=INK){
     :drawRuns(ctx,[{text:unit,font:F_ANTON,size:(unit.length>3?22:29.5)*k,track:10}],anchor-22.14*k,base-37.28*k,'left',ink);
   return {right:Math.max(r1.x1,r2.x1), left, intW:w};
 }
-function drawLimit(ctx,A,text,x,y,color=ORANGE,dark=false){
+// "PREÇO DO KG NO CLUBE": black box (2 lines, white) over a gold box with the price (as in the PSDs)
+function drawKgClub(ctx,price,x,y,cell){
+  const W=199, h1=66, gap=5, h2=58, gold=(typeof iguClubColor==='function')?iguClubColor(cell):'#f69f23';
+  rrect(ctx,x,y,W,h1,13,'#000'); rrect(ctx,x,y+h1+gap,W,h2,13,gold);
+  setFont(ctx,F_MBK,100,-30); const z1=Math.min(27,100*(W-26)/Math.max(ctx.measureText('PREÇO DO').width,ctx.measureText('KG NO CLUBE').width));
+  drawRuns(ctx,[{text:'PREÇO DO',font:F_MBK,size:z1,track:-30}],x+W/2,y+h1/2-3,'center','#fff');
+  drawRuns(ctx,[{text:'KG NO CLUBE',font:F_MBK,size:z1,track:-30}],x+W/2,y+h1/2+CAP.MontBk*z1+3,'center','#fff');
+  const t=String(price).replace('.',','); const z2=Math.min(48,100*(W-30)/(setFont(ctx,F_MBK,100,-30),ctx.measureText(t).width));
+  drawRuns(ctx,[{text:t,font:F_MBK,size:z2,track:-30}],x+W/2,y+h1+gap+(h2+CAP.MontBk*z2)/2,'center','#000');
+  return {x,y,w:W,h:h1+gap+h2};
+}
+function drawLimit(ctx,A,text,x,y,color=ORANGE,dark=false,cell=null){
+  { const kc=/PRE[CÇ]O DO KG\s*NO CLUBE[\s:]*(?:R\$\s*)?([\d.,]+)/i.exec(text)||(/CLUBE/i.test(text)&&/PRE[CÇ]O DO KG[\s:]*(?:R\$\s*)?([\d.,]+)/i.exec(text)); if(kc) return drawKgClub(ctx,kc[1],x,y,cell); }
   ctx.drawImage(dark?tinted(A.limitbox,ORANGE):A.limitbox,x,y,199,118); if(dark) color='#000';
   const m=/LIMITE\s+DE\s+(.+?)\s+POR\s+CLIENTE/i.exec(text);
-  const kg=/PRE[CÇ]O DO KG(?: NO CLUBE)?\s*([\d.,]+)/i.exec(text);
+  const kg=/PRE[CÇ]O DO KG(?: NO CLUBE)?[\s:]*(?:R\$\s*)?([\d.,]+)/i.exec(text);
   const lines=m?['LIMITE DE',m[1].replace(/\s+/g,'').toUpperCase().replace(/^(\d)(?=\D)/,'0$1'),'POR CLIENTE']:kg?[/CLUBE/i.test(text)?'KG NO CLUBE':'PREÇO DO KG',kg[1].replace('.',',')]:text.toUpperCase().split(/\s*\n\s*/);
   const W=156;
   const sizes=lines.map(ln=>{ setFont(ctx,F_MBK,100,-30); const w=ctx.measureText(ln).width; return Math.min(100*W/w, 72); });
@@ -997,7 +1009,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   // limit + tags ("EXCETO ZERO LACTOSE"): boxes stacked, moved/scaled together (ls,lx,ly)
   const limGroup=(x,y,k0=1)=>{ if(!lim&&!tags.length) return null; const ls=(AJ.ls||1)*k0, lx=AJ.lx||0, ly=AJ.ly||0;
     ctx.save(); ctx.translate(x+lx,y+ly); ctx.scale(ls,ls);
-    let yy=0, w=199; if(lim){ drawLimit(ctx,A,lim,0,0,hlc,dark); yy=118+8; }
+    let yy=0, w=199; if(lim){ const lb=drawLimit(ctx,A,lim,0,0,hlc,dark,c.color); yy=lb.h+8; }
     for(const t of tags){ const b=drawTagBox(ctx,t,0,yy,199,lim?hlc:'#fff',dark); yy+=b.h+8; }
     ctx.restore(); const h=(yy-8)*ls;
     LHITS.push({k:slot,type:'lim',x:x+lx,y:y+ly,w:w*ls,h}); return {x:x+lx,y:y+ly,w:w*ls,h}; };
