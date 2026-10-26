@@ -721,6 +721,9 @@ function drawParagraph(ctx,text,{x,top,width,font,size,track=0,align='left',colo
   for(const ln of lines){ const r=drawRuns(ctx,[{text:ln,font,size:s,track}],ax,y,align,color,{italic}); maxR=Math.max(maxR,r.x1); y+=s*lh; }
   return {lines:lines.length,bottom:y-s*lh,size:s,right:maxR};
 }
+// product sold both by kg and by unit: "KG/" over "UND" in the small unit space
+function unitLines(u){ const m=/^\s*(KG|UND?|UNID)\s*\/\s*(KG|UND?|UNID)\s*$/i.exec(u||''); if(!m) return null; const f=x=>/KG/i.test(x)?'KG':'UND'; return [f(m[1])+'/',f(m[2])]; }
+function mixedUnit(raw){ const t=' '+String(raw||'').toUpperCase()+' '; const k=t.search(/[\s(]KG[\s).,]/), u=t.search(/[\s(](UN|UND|UNID|UNIDADE)[\s).,]/); if(k<0||u<0) return null; return k<u?'KG/UND':'UND/KG'; }
 function fmtPrice(v){ const [i,c]=v.toFixed(2).split('.'); return {int:i,cents:c}; }
 
 // ---------- components ----------
@@ -789,7 +792,9 @@ function drawClubPrice(ctx,value,unit,bx,by,s){
   const base = by + S(178.3);               // 325.3 - 147
   drawRuns(ctx,runs,anchor,base,'right','#fff');
   drawRuns(ctx,[{text:p.cents,font:F_MBK,size:S(38.19*k),track:-30}],anchor-S(40.5*k),base-S(61.1*k),'center','#fff');
-  drawRuns(ctx,[{text:unit,font:F_MBK,size:S(21.83*k),track:-30}],anchor-S(40.97*k),base-S(40.8*k),'center','#fff');
+  const UL=unitLines(unit);
+  if(UL){ drawRuns(ctx,[{text:UL[0],font:F_MBK,size:S(15*k),track:-30}],anchor-S(40.97*k),base-S(44*k),'center','#fff'); drawRuns(ctx,[{text:UL[1],font:F_MBK,size:S(15*k),track:-30}],anchor-S(40.97*k),base-S(29*k),'center','#fff'); }
+  else drawRuns(ctx,[{text:unit,font:F_MBK,size:S(21.83*k),track:-30}],anchor-S(40.97*k),base-S(40.8*k),'center','#fff');
 }
 // big Anton price; returns right edge of cents/unit block
 function drawSimplePrice(ctx,value,unit,left,base,k=1,ink=INK){
@@ -799,7 +804,9 @@ function drawSimplePrice(ctx,value,unit,left,base,k=1,ink=INK){
   const anchor=left+w;
   drawRuns(ctx,runs,anchor,base,'right',ink);
   const r1=drawRuns(ctx,[{text:p.cents,font:F_ANTON,size:42.1*k,track:10}],anchor-24.8*k,base-67.65*k,'left',ink);
-  const r2=drawRuns(ctx,[{text:unit,font:F_ANTON,size:(unit.length>3?22:29.5)*k,track:10}],anchor-22.14*k,base-37.28*k,'left',ink);
+  const UL=unitLines(unit);
+  const r2=UL?(drawRuns(ctx,[{text:UL[0],font:F_ANTON,size:19*k,track:10}],anchor-22.14*k,base-45*k,'left',ink),drawRuns(ctx,[{text:UL[1],font:F_ANTON,size:19*k,track:10}],anchor-22.14*k,base-27*k,'left',ink))
+    :drawRuns(ctx,[{text:unit,font:F_ANTON,size:(unit.length>3?22:29.5)*k,track:10}],anchor-22.14*k,base-37.28*k,'left',ink);
   return {right:Math.max(r1.x1,r2.x1), left, intW:w};
 }
 function drawLimit(ctx,A,text,x,y,color=ORANGE,dark=false){
@@ -823,14 +830,16 @@ function iguClubPrice(ctx,value,unit,bx,by,s,ink='#000'){
   const S=v=>v*s; const p=fmtPrice(value||0);
   let k=1, wR,wI,wC,W;
   const meas=()=>{ setFont(ctx,F_MBK,S(30.55*k),-30); wR=ctx.measureText('R$').width; setFont(ctx,F_MBK,S(114.38*k),-30); wI=ctx.measureText(p.int).width;
-    setFont(ctx,F_MBK,S(36.45*k),-30); const a=ctx.measureText(p.cents).width; setFont(ctx,F_MBK,S(19.7*k),-30); wC=Math.max(a,ctx.measureText(unit).width); W=wR+wI+S(3*k)+wC; };
+    setFont(ctx,F_MBK,S(36.45*k),-30); const a=ctx.measureText(p.cents).width; const ul=unitLines(unit); setFont(ctx,F_MBK,S((ul?14:19.7)*k),-30); wC=Math.max(a,...(ul||[unit]).map(t=>ctx.measureText(t).width)); W=wR+wI+S(3*k)+wC; };
   meas(); while(W>S(242)&&k>0.55){ k*=0.95; meas(); }
   const left=bx+(S(260)-W)/2+S(2), base=by+S(162.8)-S(8)*(1-k);
   drawRuns(ctx,[{text:'R$',font:F_MBK,size:S(30.55*k),track:-30}],left,base,'left',ink);
   drawRuns(ctx,[{text:p.int,font:F_MBK,size:S(114.38*k),track:-30}],left+wR,base,'left',ink);
   const cx=left+wR+wI+S(3*k)+wC/2;
   drawRuns(ctx,[{text:p.cents,font:F_MBK,size:S(36.45*k),track:-30}],cx,base-S(53.6*k),'center',ink);
-  drawRuns(ctx,[{text:unit,font:F_MBK,size:S(19.7*k),track:-30}],cx,base-S(36.4*k),'center',ink);
+  const UL=unitLines(unit);
+  if(UL){ drawRuns(ctx,[{text:UL[0],font:F_MBK,size:S(14*k),track:-30}],cx,base-S(39*k),'center',ink); drawRuns(ctx,[{text:UL[1],font:F_MBK,size:S(14*k),track:-30}],cx,base-S(26*k),'center',ink); }
+  else drawRuns(ctx,[{text:unit,font:F_MBK,size:S(19.7*k),track:-30}],cx,base-S(36.4*k),'center',ink);
   drawRuns(ctx,[{text:'.',font:F_MBK,size:S(114.38*k),track:0}],cx-S(7*k),base,'center',ink);
 }
 // stack origin = top-left of the name box (258x154); icon sticks out above (-74)
@@ -1305,7 +1314,7 @@ function stampPrep(ctx,st,item,s){
   // the unit/cents actually drawn can be wider than the PSD's ("UND" vs "KG"): grow their boxes so nothing sits on top of them
   const grow=(k,txt)=>{ const q=parts[k]; if(!q) return; const now=runsW(ctx,[{...q.runs[0],t:txt}],s)/s, was=runsW(ctx,q.runs,s)/s, d=now-was; if(d<=0) return;
     const rb=[...q.rb]; if(q.just===1) rb[0]-=d; else if(q.just===2){ rb[0]-=d/2; rb[2]+=d/2; } else rb[2]+=d; parts[k]={...q,rb}; };
-  if(parts.unit){ const per=club?item.cunit:item.punit; const u0=parts.unit.text.replace(/[\r\n]+$/,''); let tt=(per||item.unit||'UND'); if(u0===u0.toLowerCase()) tt=tt.toLowerCase(); grow('unit',tt); }
+  if(parts.unit){ const per=club?item.cunit:item.punit; const u0=parts.unit.text.replace(/[\r\n]+$/,''); let tt=(per||item.unit||'UND'); if(u0===u0.toLowerCase()) tt=tt.toLowerCase(); if(!unitLines(tt)) grow('unit',tt); }
   const pos=item.namePos&&item.namePos!=='auto'?item.namePos:null;
   if(pos&&parts.name){
     const others=Object.entries(parts).filter(([k])=>k!=='name').map(([,p])=>p.rb).concat(rasters.filter(r=>!r.under).map(r=>r.rb));
@@ -1355,10 +1364,10 @@ function limitOf(item){ const n=(item.notes||[]).find(x=>/LIMITE/i.test(x)); if(
 function procLayout(ctx,st,item,s){
   const S=procStyle(st), F=S.F0*s*(S.k||1), ops=[]; const club=st.kind==='club'&&item.club;
   const price=club?item.club:item.price; const p=fmtPrice(price||0); const unit=((club?item.cunit:item.punit)||item.unit||'UND').toUpperCase().replace('UN','UND').replace('UNDD','UND');
-  const ut=/100G/.test(unit)?'100G':/KG/.test(unit)?'KG':'UND';
+  const UL=unitLines(unit); const ut=UL?UL[1]:/100G/.test(unit)?'100G':/KG/.test(unit)?'KG':'UND';
   // price row: [R$] INT. [cents/unit]
   const dK=S.dotK||1, IN=mtx(ctx,p.int,S.fam,F), DT=mtx(ctx,'.',S.fam,F*dK); const I={w:IN.w+DT.w}; const cap=mtx(ctx,'0',S.fam,F).asc;
-  const C=mtx(ctx,p.cents,S.fam,F*S.rC), U=mtx(ctx,ut,S.fam,F*S.rU), R=S.rs?mtx(ctx,'R$',S.fam,F*S.rRS):{w:0,asc:0};
+  const C=mtx(ctx,p.cents,S.fam,F*S.rC), U=UL?(()=>{ const a=mtx(ctx,UL[0],S.fam,F*S.rU*0.72), b=mtx(ctx,UL[1],S.fam,F*S.rU*0.72); return {w:Math.max(a.w,b.w),asc:a.asc}; })():mtx(ctx,ut,S.fam,F*S.rU), R=S.rs?mtx(ctx,'R$',S.fam,F*S.rRS):{w:0,asc:0};
   // as in the PSDs: small R$ at the top-left, cents/unit column sitting over the dot of "9."
   const g1=S.rs?F*0.02:0, ov=F*0.14; const colW=Math.max(C.w,U.w);
   const rowW=R.w+g1+I.w-ov+colW;
@@ -1366,7 +1375,8 @@ function procLayout(ctx,st,item,s){
     if(S.rs) ops.push({t:'R$',fam:S.fam,size:F*S.rRS,x,y:y+R.asc,col});
     ops.push({t:p.int,fam:S.fam,size:F,x:x+R.w+g1,y:y+cap,col}); ops.push({t:'.',fam:S.fam,size:F*dK,x:x+R.w+g1+IN.w,y:y+cap+(dK<1?F*0.06:0),col});
     const cx=x+R.w+g1+I.w-ov; ops.push({t:p.cents,fam:S.fam,size:F*S.rC,x:cx+(colW-C.w)/2,y:y+C.asc,col});
-    ops.push({t:ut,fam:S.fam,size:F*S.rU,x:cx+(colW-U.w)/2,y:y+C.asc+F*0.035+U.asc,col}); };
+    if(UL){ const z=F*S.rU*0.72; UL.forEach((t,i)=>{ const w=mtx(ctx,t,S.fam,z).w; ops.push({t,fam:S.fam,size:z,x:cx+(colW-w)/2,y:y+C.asc+F*0.03+U.asc+i*U.asc*1.3,col}); }); }
+    else ops.push({t:ut,fam:S.fam,size:F*S.rU,x:cx+(colW-U.w)/2,y:y+C.asc+F*0.035+U.asc,col}); };
   const nS=F*S.rN*(club?1.15:1)*NAMESIZE*((item.adj&&item.adj.ns)||1), lh=nS*1.18;
   const nameTxt=caseName(item.name,S.caps?'AB':(S.nSample.split(/\r/)[0]||'Ab'));
   const lim=limitOf(item);
@@ -1455,7 +1465,11 @@ function drawStamp(ctx,A,st,item,x,y,s){
   adj(P.cents); if(P.cents){ const p=fmtPrice(price||0); drawPart(ctx,P.cents,centsRuns(P.cents.runs,p.cents),ax,ay,s); }
   adj(P.unit); if(P.unit){ const per=club?item.cunit:item.punit; const u0=P.unit.text.replace(/[\r\n]+$/,''); let tt=(per||item.unit||'UND');
     if(/cada/i.test(u0)&&/G$/i.test(tt)) tt='CADA\r'+tt; if(u0===u0.toLowerCase()) tt=tt.toLowerCase();
-    drawPart(ctx,P.unit,[{...P.unit.runs[0],t:tt}],ax,ay,s); }
+    const UL=unitLines(tt);
+    if(UL){ const b=[ax+P.unit.rb[0]*s, ay+P.unit.rb[1]*s, ax+P.unit.rb[2]*s, ay+P.unit.rb[3]*s], h=b[3]-b[1], r0={...P.unit.runs[0],size:P.unit.runs[0].size*0.62};
+      const x=P.unit.just===1?b[2]:P.unit.just===2?(b[0]+b[2])/2:b[0];
+      const l=u0===u0.toLowerCase()?UL.map(z=>z.toLowerCase()):UL; drawRunLine(ctx,[{...r0,t:l[0]}],x,b[1]+h*0.62,s,P.unit.just); drawRunLine(ctx,[{...r0,t:l[1]}],x,b[1]+h*1.34,s,P.unit.just); }
+    else drawPart(ctx,P.unit,[{...P.unit.runs[0],t:tt}],ax,ay,s); }
   adj(P.rs); if(P.rs) drawPart(ctx,P.rs,P.rs.runs,ax,ay,s);
   adj(P.name);
   let bot=y+(Q.bbox[3]-Q.bbox[1])*s;
@@ -2582,7 +2596,7 @@ async function applySheet(sh,name,replayFile,forced,reload){
   $('#in-cities').dataset.manual='';
   S.grids=sh.grids.map((g,gi)=>{
     const items=g.items.map((x,i)=>{ const k=keyOf(x.raw); const m=MEM[k]||{}; return {...x, i, raw0:x.raw, orig:{name:x.name,price:x.price,club:x.club,unit:x.unit}, name:m.name||x.name, imgIds:[], conf:'none', variant:m.variant||'', rot:m.rot||{}, namePos:m.namePos||'', sh:m.sh||null}; });
-    for(const it of items) autoPickImages(it);
+    for(const it of items){ const mu=mixedUnit(it.raw); if(mu&&!it.punit){ it.unit=mu; it.orig.unit=mu; } autoPickImages(it); }
     const G={label:g.label+(g.bebidas?' · bebidas':''), items, cities:sh.cities, bebidas:!!g.bebidas, gvalidity:g.validity||null, validity:sh.validity?{...sh.validity}:{from:'',to:''},
       tpl:g.tpl||T0.id, kind:g.kind||null, band:g.band?('OFERTA VÁLIDA SOMENTE PARA '+g.band):'', bd:null, title:g.tplHint||sh.title||'', ...(()=>{ const id=g.tpl||T0.id; let nc=null,ns=null; try{ nc=localStorage.getItem('nc:'+id); ns=+localStorage.getItem('ns:'+id)||null; }catch(_){} return {nameCase:nc||undefined,nameSize:ns||undefined}; })()};
     activate(G); const slots=autoAssign(items); const slotOf={}; for(const [s,it] of Object.entries(slots)) slotOf[it.i]=s;
@@ -2736,7 +2750,7 @@ function buildRows(gi){
     const nameIn=el('textarea',{class:'nm',rows:2,placeholder:'Nome do produto (como na planilha)',onchange:e=>onNameChange(gi,it,e.target.value)}); nameIn.value=it.name;
     const pIn=el('input',{class:'pr',value:it.price!=null?it.price.toFixed(2):'',onchange:e=>{ it.price=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
     const cIn=el('input',{class:'pr',placeholder:'—',value:it.club!=null?it.club.toFixed(2):'',onchange:e=>{ it.club=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
-    const uSel=el('select',{class:'un',onchange:e=>{ it.unit=e.target.value; buildRows(gi); renderSoon(gi); }},...['UND','KG'].map(u=>el('option',{value:u,selected:it.unit===u},u)));
+    const uSel=el('select',{class:'un',onchange:e=>{ it.unit=e.target.value; buildRows(gi); renderSoon(gi); }},...['UND','KG','KG/UND','UND/KG'].map(u=>el('option',{value:u,selected:it.unit===u},u)));
     const varSel=tplOfGrid(g).kind==='replay'?null:el('select',{class:'var',id:`var-${gi}-${it.i}`,onchange:e=>{ it.variant=e.target.value; remember(it,{variant:it.variant}); renderSoon(gi); }},
       el('option',{value:''},'Automático'),...Object.entries(VAR_LABEL).filter(([k])=>it.club?k.startsWith('club'):k.startsWith('simple')).map(([k,v])=>el('option',{value:k,selected:it.variant===k},v)));
     const thumbs=el('div',{class:'th',id:`th-${gi}-${it.i}`});
