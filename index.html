@@ -195,7 +195,7 @@ body.mobile .desk{display:none!important}
     <figure class="chk"><canvas id="ni-c" width="300" height="300"></canvas><figcaption>Recorte</figcaption></figure>
   </div>
   <div class="nic">
-    <div class="modes"><button data-m="ia">Remover fundo com IA</button><button data-m="branco">Só fundo branco</button><button data-m="orig">Manter como está</button>
+    <div class="modes"><button data-m="branco">Só fundo branco</button><button data-m="ia">Remover fundo com IA</button><button data-m="orig">Manter como está</button>
     <label class="sharp"><input type="checkbox" id="ni-sharp"> Melhorar nitidez</label></div>
     <div id="ni-st" class="st"></div>
     <label class="nm2">Salvar no banco com o nome<input id="ni-name"></label>
@@ -2040,7 +2040,7 @@ async function openNewImage(gi,it,blob){
   $('#ni-name').value=it.name; $('#ni-prod').textContent=it.raw;
   drawPreview($('#ni-a'),src,'#fff'); drawPreview($('#ni-b'),null);
   $('#ni-save').disabled=true; $('#newimg').showModal();
-  runRemoval('ia');
+  runRemoval('branco');   // fast: white background only; the AI stays one click away
 }
 async function runRemoval(mode){
   if(!NI) return; NI.mode=mode; const my=NI;
@@ -2062,7 +2062,7 @@ async function runRemoval(mode){
     if($('#ni-sharp').checked) canvas=enhance(canvas);
     if(NI!==my) return;
     NI.out=canvas; drawPreview($('#ni-b'),canvas,'#fe8800'); drawPreview($('#ni-c'),canvas,null);
-    st.textContent= mode==='ia'?'Pronto. Confira o recorte nos dois fundos.':'Pronto.'; $('#ni-save').disabled=false;
+    st.textContent= mode==='ia'?'Pronto. Confira o recorte nos dois fundos.':mode==='branco'?'Pronto (só o fundo branco). Se sobrar fundo, use "Remover fundo com IA" ou "Recortar no Photoshop".':'Pronto.'; $('#ni-save').disabled=false;
   }catch(e){
     console.error(e);
     st.textContent= mode==='ia'?'Não consegui usar a IA ('+e.message+'). Tente "Só fundo branco" ou verifique a internet.':'Erro: '+e.message;
