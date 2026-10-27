@@ -1688,10 +1688,10 @@ function zoneOf(T,bd,kind,band){
   if(kind==='grid'){ const G=T.grid; const gx=bd.grid?[bd.grid.zone[0],bd.grid.zone[2]]:(G?G.zoneX:[16,bd.W-16]);
     const gt=G?Math.max(4,Math.min(40,G.gapTop)):12, gb=G?Math.max(4,Math.min(60,G.gapBot)):14;
     let y0=top+gt, y1=bd.foot-Math.max(22,gb); if(bd.grid&&!!bd.band===!!band){ y0=bd.grid.zone[1]; y1=bd.grid.zone[3]; }
-    if(bd.grid&&!!bd.band!==!!band&&br) y0=Math.max(y0,br[3]+gt);
+    if(br) y0=Math.max(y0,br[3]+Math.max(8,gt));   // never under the city band
     y1=Math.min(y1,bd.foot-18);      // always a little air between the grid and the validity text
     return [gx[0],y0,gx[1],y1]; }
-  return [26,top+14,bd.W-26,bd.foot-44];
+  return [26,top+(br?30:14),bd.W-26,bd.foot-44];
 }
 // ---- grid ----
 // cells always fill the whole zone. 2 columns: each column split evenly (7 items = 4 + 3, like the PSDs).
@@ -1878,12 +1878,15 @@ function drawBlock(ctx,spec,lines){
   const f=runFont(r,1);
   const wid=l=>{ setFont(ctx,f.font,f.size*k,f.track); return ctx.measureText(r.caps?l.toUpperCase():l).width; };
   // longer than the template (e.g. two months spelled out): re-wrap the words first, shrink only if still needed
-  if(lines.some(l=>wid(l)>maxW)){ const words=lines.join(' ').split(/\s+/).filter(Boolean); const out=[]; let cur='';
-    for(const w of words){ const t=cur?cur+' '+w:w; if(cur&&wid(t)>maxW){ out.push(cur); cur=w; } else cur=t; } if(cur) out.push(cur);
-    if(out.length<=Math.max(n0,lines.length)+1) lines=out; }
+  // keep the template's number of lines (a little smaller) before adding a line; never grow past the template box
+  const rewrap=()=>{ const words=lines.join(' ').split(/\s+/).filter(Boolean); const out=[]; let cur='';
+    for(const w of words){ const t=cur?cur+' '+w:w; if(cur&&wid(t)>maxW){ out.push(cur); cur=w; } else cur=t; } if(cur) out.push(cur); return out; };
+  if(lines.some(l=>wid(l)>maxW)){ const k0=k; let out=rewrap(); while(out.length>Math.max(n0,lines.length)&&k>0.8){ k*=0.97; out=rewrap(); }
+    if(out.length>Math.max(n0,lines.length)){ k=k0; out=rewrap(); } if(out.length<=Math.max(n0,lines.length)+1) lines=out; }
   while(lines.some(l=>wid(l)>maxW)&&k>0.7) k*=0.96;
   let lh= n0>1 ? ((b[3]-b[1])-r.size*0.75)/(n0-1) : r.size*1.2;
-  if(lines.length>n0&&n0>=1) lh=Math.min(lh,r.size*1.15);
+  if(lines.length>n0&&n0>=1){ const H=(b[3]-b[1])+6; lh=Math.min(lh,r.size*1.15);
+    while(textInk(ctx,'H',r,1).asc*k+(lines.length-1)*lh>H&&k>0.6){ k*=0.96; lh=Math.min(lh,r.size*k*1.18); } }
   const x= spec.just===1? b[2] : spec.just===2? (b[0]+b[2])/2 : b[0];
   const asc=textInk(ctx,'H',r,1).asc;
   let y=b[1]+asc*k;
