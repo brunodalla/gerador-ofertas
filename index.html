@@ -2138,24 +2138,33 @@ async function queuePhotoshop(){
   const blob=await new Promise(r=>c.toBlob(r,'image/png'));
   try{ const qd=await BANK.dir.getDirectoryHandle('_recortar',{create:true}); const fh=await qd.getFileHandle(name+'.png',{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close(); }
   catch(e){ toast('Não consegui colocar na fila: '+e.message,'err'); return; }
-  const t=Date.now(); PSQ.push({gi,it,file:name+'.png',name,t}); it.psPending=true;
+  const t=Date.now(); PSQ.push({gi,it,file:name+'.png',name,t}); it.psPending=true; it.psFile=name+'.png'; it.psT=t;
   $('#newimg').close(); NI=null; buildRows(gi);
-  toastAction(`"${name}" está na fila do Photoshop (${PSQ.length}). No Photoshop: Arquivo › Scripts › Procurar… › ELEMENTOS\\Recortar no Photoshop.jsx. A imagem entra aqui sozinha quando ficar pronta.`,'Ok',()=>{});
-  if(!PSQ_T) PSQ_T=setInterval(pollPhotoshop,2500);
+  toastAction(`"${name}" está na fila do Photoshop (${PSQ.length}). No Photoshop: Arquivo › Scripts › Procurar… › ELEMENTOS\\Recortar no Photoshop.jsx. A imagem entra aqui sozinha quando ficar pronta.${BANK.dir.fresh?' (Pelo Google Drive: espere uns 15 segundos antes de rodar o script, para a imagem chegar no computador.)':''}`,'Ok',()=>{});
+  if(!PSQ_T) PSQ_T=setInterval(pollPhotoshop,3000);
 }
+let PSQ_BUSY=false;
 async function pollPhotoshop(){
-  if(!PSQ.length||!BANK.dir){ clearInterval(PSQ_T); PSQ_T=null; return; }
-  for(const q of [...PSQ]){
-    let f=null; try{ f=await (await BANK.dir.getFileHandle(q.file)).getFile(); }catch(e){ continue; }
-    if(!f||f.lastModified<q.t-1000) continue;
-    const id='b:'+q.file; const h=await BANK.dir.getFileHandle(q.file);
-    const item={id,name:q.name,handle:h,file:null,mod:f.lastModified,src:'banco'};
+  if(!PSQ.length){ clearInterval(PSQ_T); PSQ_T=null; return; }
+  if(!BANK.dir||PSQ_BUSY) return; PSQ_BUSY=true;
+  try{ for(const q of [...PSQ]){
+    let h=null, mod=0;
+    try{ h=BANK.dir.fresh?await BANK.dir.fresh(q.file):await BANK.dir.getFileHandle(q.file); }catch(e){ h=null; }
+    if(!h) continue;
+    try{ mod=h._mod||(await h.getFile()).lastModified; }catch(e){ continue; }
+    if(mod<q.t-1000) continue;
+    const id='b:'+q.file.normalize('NFC');
+    const item={id,name:q.name,handle:h,file:null,mod,src:'banco'};
     S.lib.items=S.lib.items.filter(x=>x.id!==id); S.lib.items.push(item); S.lib.byId.set(id,item); S.lib.index=buildIndex(S.lib.items); S.imgCache.delete(id);
-    BANK.index[q.file]={name:q.name,file:q.file,mod:f.lastModified,origem:'photoshop'}; try{ await writeBankIndex(); }catch(e){}
+    BANK.index[q.file]={name:q.name,file:q.file,mod,origem:'photoshop'}; try{ await writeBankIndex(); }catch(e){}
     const it=q.it; it.imgIds=[id].concat((it.imgIds||[]).filter(x=>x!==id).slice(1)); it.conf='mem'; it.psPending=false; remember(it,{imgs:it.imgIds});
-    PSQ.splice(PSQ.indexOf(q),1); buildRows(q.gi); renderSoon(q.gi); toast(`Recorte do Photoshop aplicado: ${q.name}`);
-  }
+    delete it.psFile; delete it.psT;
+    PSQ.splice(PSQ.indexOf(q),1); buildRows(q.gi); renderSoon(q.gi); jobChanged(); toast(`Recorte do Photoshop aplicado: ${q.name}`);
+  } } finally{ PSQ_BUSY=false; }
 }
+// after reopening a job (or reloading the page) keep waiting for the cuts that were still in the Photoshop queue
+function resumePhotoshop(){ S.grids.forEach((g,gi)=>g.items.forEach(it=>{ if(it.psPending&&it.psFile&&!PSQ.some(q=>q.it===it)) PSQ.push({gi,it,file:it.psFile,name:it.psFile.replace(/\.png$/i,''),t:it.psT||0}); else if(it.psPending&&!it.psFile) it.psPending=false; }));
+  if(PSQ.length&&!PSQ_T) PSQ_T=setInterval(pollPhotoshop,3000); }
 async function saveNewImage(){
   if(!NI||!NI.out) return; const {gi,it}=NI; const name=$('#ni-name').value.trim()||it.name;
   const blob=await new Promise(r=>NI.out.toBlob(r,'image/png'));
@@ -2234,12 +2243,15 @@ async function gdUpload(blob,name,parent,id){
 class GDir{
   constructor(id,name){ this.id=id; this.name=name; this.kind='directory'; this._c=null; }
   async _list(){ if(this._c) return this._c; const fs=await gdList(`'${this.id}' in parents and trashed=false`); const m=new Map();
-    for(const f of fs.sort((a,b)=>Date.parse(a.modifiedTime)-Date.parse(b.modifiedTime))) m.set(f.name,f.mimeType===GD_FOLDER?new GDir(f.id,f.name):new GFile(f,this));
+    for(const f of fs.sort((a,b)=>Date.parse(a.modifiedTime)-Date.parse(b.modifiedTime))) m.set(f.name.normalize('NFC'),f.mimeType===GD_FOLDER?new GDir(f.id,f.name):new GFile(f,this));
     return this._c=m; }
+  // ask Drive right now for one file (new files appear without re-listing the whole folder)
+  async fresh(name){ const n=name.normalize('NFC'); const fs=(await gdList(`name='${gdq(n)}' and '${this.id}' in parents and trashed=false`)).concat(n!==name.normalize('NFD')?await gdList(`name='${gdq(name.normalize('NFD'))}' and '${this.id}' in parents and trashed=false`):[]);
+    if(!fs.length) return null; const f=fs.sort((a,b)=>Date.parse(b.modifiedTime)-Date.parse(a.modifiedTime))[0]; const h=new GFile(f,this); if(this._c) this._c.set(n,h); return h; }
   async *entries(){ for(const [n,h] of await this._list()) yield [n,h]; }
   async *values(){ for(const h of (await this._list()).values()) yield h; }
   async *keys(){ for(const n of (await this._list()).keys()) yield n; }
-  async getFileHandle(name,o={}){ const m=await this._list(); const h=m.get(name); if(h&&h.kind==='file') return h;
+  async getFileHandle(name,o={}){ name=String(name).normalize('NFC'); const m=await this._list(); const h=m.get(name); if(h&&h.kind==='file') return h;
     if(!o.create) throw new DOMException(name+' não encontrado','NotFoundError'); const f=new GFile({id:null,name},this); m.set(name,f); return f; }
   async getDirectoryHandle(name,o={}){ const m=await this._list(); const h=m.get(name); if(h&&h.kind==='directory') return h;
     if(!o.create) throw new DOMException(name+' não encontrado','NotFoundError'); const f=await gdFolder(name,this.id,true); const d=new GDir(f.id,f.name); m.set(name,d); return d; }
@@ -2846,6 +2858,7 @@ function buildGridUI(){
     root.append(card); buildRows(gi);
   });
   $('#actions').hidden=false;
+  resumePhotoshop();
 }
 // ---------- drag on the preview: move the photo or the price of a product directly ----------
 function previewCanvas(gi){
@@ -2964,7 +2977,7 @@ async function refreshThumbs(gi){
     const bad=!fixedArt&&(it.conf==='low'||it.conf==='none'||!it.imgIds.length);
     if(bad) issues++;
     fl.textContent= it.psPending?'aguardando Photoshop': fixedArt?'foto da arte':!it.imgIds.length?'sem imagem': (it.missing&&it.conf==='low')?'falta 2ª imagem': it.conf==='low'?'conferir': it.conf==='mem'?'salva': it.multi?'2 versões':'';
-    fl.className='flag '+(bad?'warn':'');
+    fl.className='flag '+(bad||it.psPending?'warn':''); fl.onclick=it.psPending?(e=>{ e.stopPropagation(); pollPhotoshop(); toast('Procurando o recorte no banco…'); }):null; if(it.psPending) fl.title='Clique para procurar agora';
     const nm=it.imgIds.map(id=>S.lib.byId.get(id)?.name||(id.startsWith('manual:')?'arquivo enviado':'')).join(' + ');
     th.title=nm;
   }
