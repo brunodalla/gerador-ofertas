@@ -93,6 +93,7 @@ details.more{margin-top:6px;font-size:12.5px;color:var(--mut)} details.more summ
 .adj{display:flex;align-items:center;gap:6px 10px;font-size:12px;color:var(--mut);margin-top:8px;flex-wrap:wrap} .adjv{display:none}
 .adj>b{display:inline-block;width:52px;color:var(--ink);font-weight:600}
 .adjg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.adj.hlt>b{width:auto;margin-right:2px} .hchip{font:600 12px inherit;padding:4px 10px;border-radius:99px;border:1px dashed var(--line2);background:transparent;color:var(--mut);cursor:pointer} .hchip.on{border-style:solid;border-color:var(--or);background:var(--orbg);color:var(--or2)} .hin{width:230px;padding:4px 8px;font-size:12.5px;text-transform:uppercase}
 .fine{display:inline-flex;align-items:center;gap:3px} .fine input[type=range]{width:86px;margin:0 2px}
 .fbtn{width:22px;height:22px;border:1px solid var(--line2);background:var(--card2);color:var(--ink);border-radius:6px;font:600 14px/1 inherit;cursor:pointer;padding:0;user-select:none;touch-action:none} .fbtn:hover{border-color:var(--or)}
 .fnum{width:52px;padding:2px 5px;border-radius:6px;font-size:12px;text-align:right}
@@ -475,6 +476,9 @@ function parsePer(v){ // "2,99 A CADA 100G" -> {v:2.99, per:'100G'}
   if(m) return {v:parsePrice(m[1]),per:m[2]+'G'};
   return {v:parsePrice(v),per:null};
 }
+// a line/row without price right after a product that reads like extra info for it ("SEM DORSAL", "(casco retornável)", "nesta embalagem a unidade sai por 2,89")
+function looksNote(t){ t=String(t||'').trim(); if(!t||t.length>90) return false; return /^[(*•\-–]/.test(t)||/\b(SEM|EXCETO|LIMITE|EMBALAGEM|UNIDADE SAI|RETORN\w*|CASCO|SABORES|CADA|NESTA|DESTACAR|LEVE\s+\d)\b|\d+\s*(ML|L|LT)\b/i.test(t); }
+function addNote(it,t){ t=String(t).replace(/^[(*•\-–\s]+|[)\s]+$/g,'').trim(); if(!t) return; it.notes=[...(it.notes||[]),t]; it.note=it.notes.join(' · '); }
 function parseOfferSheet(rows){
   const title=(rows[0]&&rows[0][0])||'';
   let cities='';
@@ -488,8 +492,9 @@ function parseOfferSheet(rows){
     if(/PRE[CÇ]O/i.test(String(r[1]||''))||/PRE[CÇ]O/i.test(String(r[2]||''))||/^DESCRI[CÇ][AÃ]O$/i.test(a)) continue;
     if(!a) continue;
     if(!cur){ cur={label:'ARTE',items:[],note:'',bebidas:false,validity:null}; grids.push(cur); }
+    if(/NESTA EMBALAGEM|SAI POR/i.test(a)&&cur.items.length){ const last=cur.items[cur.items.length-1]; addNote(last,[a,r[1],r[2]].filter(x=>x!=null&&String(x).trim()).map(x=>typeof x==='number'?x.toFixed(2).replace('.',','):x).join(' ')); continue; }
     const P=parsePer(r[1]), Cc=parsePer(r[2]);
-    if(P.v==null&&Cc.v==null){ skipped.push(a); continue; }
+    if(P.v==null&&Cc.v==null){ const last=cur.items[cur.items.length-1]; if(last&&looksNote(a)){ addNote(last,a); rest.forEach(x=>addNote(last,x)); } else skipped.push(a); continue; }
     let note=rest.filter(n=>!/^DAR DESTAQUE/i.test(n)).join(' · ');
     let raw=a; const hl=isYellow(r.fill&&r.fill[0])||DESTAQUE_RX.test(raw)||DESTAQUE_RX.test(note);
     if(DESTAQUE_RX.test(raw)){ raw=raw.replace(/[-–—.(\s]*\b(PRODUTO\s+(EM\s+)?)?DESTAQUE\b[^)]*\)?\.?\s*$/i,'').trim(); }
@@ -645,10 +650,12 @@ function parseTextOffers(lines,fname){
         ||(/\d{1,2}\/\d{1,2}/.test(l)&&(DAYS_RX.test(l)||/EXCLUSIV|SOMENTE/i.test(l))&&!/:\s*$/.test(l));
       if(hdr){
         camp={title:l,validity:parseValidity(l)||parseLooseDates(l),band:/EXCLUSIV|SOMENTE/i.test(l)?storeOf(l.toUpperCase()):''}; if(!title){ title=l; validity=camp.validity; } sec=null; continue; }
+      const lastIt=sec&&sec.items[sec.items.length-1]; if(lastIt&&looksNote(l)&&!/:\s*$/.test(l)){ addNote(lastIt,l); continue; }
       const kind=/GRID/i.test(l)?'grid':/CAPA/i.test(l)?'capa':null;
       const band=/EXCLUSIV|SOMENTE/i.test(l)?storeOf(l.toUpperCase()):'';
       newSec(l.replace(/[:*]/g,'').trim(),kind,band); sec.explicit=true; if(/PADARIA|\bP[ÃA]O\b/i.test(l)) sec.pao=true; continue;
     }
+    { const lastIt=sec&&sec.items[sec.items.length-1]; if(lastIt&&/NESTA EMBALAGEM|SAI POR|\bCADA UMA\b/i.test(l)){ addNote(lastIt,l); continue; } }
     const it=parseItemLine(l); if(!it) continue;
     if(!sec){ newSec(camp?camp.title:'ARTE',null,''); sec.auto=true; }
     sec.items.push(it);
@@ -675,11 +682,12 @@ function parseBigolinRows(rows,fname){
     if(!r) continue; const a=String(r[0]||'').trim(), b=String(r[1]||'').replace(/\s+/g,' ').trim(); const c=r[2];
     if(!b) continue;
     const pr=c!=null?parsePrice(c):null;
-    if(pr==null){ if(/^insta/i.test(b)){ if(camp) camp.version=(camp.version||1)+1; continue; }
+    if(pr==null){ const lst=camp&&[...camp.capa,...camp.grid].pop(); if(lst&&looksNote(b)){ addNote(lst,b); continue; } if(/^insta/i.test(b)){ if(camp) camp.version=(camp.version||1)+1; continue; }
       camp={title:b,validity:parseLooseDates(b),capa:[],grid:[]}; arts.push(camp); if(!title){ title=b; validity=camp.validity; } continue; }
     if(!camp){ camp={title:fname,validity:parseLooseDates(fname),capa:[],grid:[]}; arts.push(camp); }
     const {name,unit}=splitUnit(b.toUpperCase());
     const it={raw:b.toUpperCase(),name,unit,price:pr,club:null,hl:false,note:'',notes:[]};
+    for(const x of r.slice(3)) if(x!=null&&String(x).trim()) addNote(it,x);
     (/CAPA/i.test(a)?camp.capa:camp.grid).push(it);
   }
   const grids=[];
@@ -910,6 +918,36 @@ function drawIguSplit(ctx,A,it,gx,gy,s,dark,cell,nz=1){
   iguClubBox(ctx,A,it,gx+s*266,gy+s*49.5,s,cell);
   return {x:gx,y:gy,w:s*IGU_SPLIT.W,h:s*IGU_SPLIT.H};
 }
+// ---------- destaques: caixinhas no estilo do limite ("SEM DORSAL", "550ML", "CASCO RETORNÁVEL", "NESTA EMBALAGEM A UNIDADE SAI POR 2,89") ----------
+const HLT_SKIP=/VERIFI|CONFER|\bCD\b|LISTA|\bOBS\b|MANTER|\bFOTO|IMAGEM|\bARTE\b|PLANILHA|TROCAR|DAR DESTAQUE|PRODUTO EM DESTAQUE|^\s*DESTAQUE\.?\s*$|\bGRID|LIMITE|PRE[CÇ]O DO KG/i;
+function hltClean(t){ return String(t||'').replace(/^\s*(DESTACAR|DESTAQUE(\s+(PARA|NO|NA|O|A|DO|DA))?|COLOCAR|INSERIR|ESCREVER|ADICIONAR)\s*:?\s*/i,'').replace(/^["“'(]+|["”')]+$/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
+function autoHlt(item){ const ns=item.notes||(item.note?[item.note]:[]); return [...new Set(ns.filter(n=>n&&!HLT_SKIP.test(n)).map(hltClean).filter(Boolean))]; }
+function itemHlt(item){ return Array.isArray(item.hlt)?item.hlt:autoHlt(item); }
+function hltLines(text){
+  const t=String(text||'').toUpperCase().replace(/\s+/g,' ').trim(); if(!t) return [];
+  if(/\s\/\s|\||\n/.test(t)) return t.split(/\s\/\s|\||\n/).map(x=>x.trim()).filter(Boolean);
+  // balanced lines of ~17 letters at most (ties: shorter first line)
+  const wrap=s=>{ const w=s.split(' '); if(s.length<=17||w.length<2) return [s]; const n=Math.min(w.length,Math.ceil(s.length/17));
+    let best=null; const rec=(i,k,acc)=>{ if(k===1){ const L=[...acc,w.slice(i).join(' ')]; const sc=Math.max(...L.map(x=>x.length))*100+L[0].length; if(!best||sc<best.sc) best={sc,L}; return; }
+      for(let j=i+1;j<=w.length-k+1;j++) rec(j,k-1,[...acc,w.slice(i,j).join(' ')]); };
+    rec(0,n,[]); return best.L; };
+  const m=/^(.*\S)\s+((?:R\$\s*)?\d+(?:[.,]\d+)?\s*(?:ML|L|LT|LITROS?|KG|G|GR|UN|UND|UNID)?)$/.exec(t);
+  if(m&&m[1].length>3) return [...wrap(m[1]),m[2].replace('.',',')];
+  const w=t.split(' '); if(w.length>=2&&t.length<=22){ let b=1,d=1e9; for(let i=1;i<w.length;i++){ const x=Math.abs(w.slice(0,i).join(' ').length-w.slice(i).join(' ').length); if(x<d){ d=x; b=i; } } return [w.slice(0,b).join(' '),w.slice(b).join(' ')]; }
+  return wrap(t);
+}
+// limit-style box: black, each line as wide as the box (numbers bigger)
+function drawHltBox(ctx,text,x,y,color,dark,W0){
+  const lines=hltLines(text); if(!lines.length) return {x,y,w:0,h:0};
+  const isNum=l=>/\d/.test(l)&&l.length<=8;
+  setFont(ctx,F_MBK,100,-30); const w100=lines.map(l=>ctx.measureText(l).width);
+  const W=W0||(lines.length===1&&isNum(lines[0])?165:199);
+  const sizes=lines.map((l,i)=>Math.min(isNum(l)?(lines.length===1?60:54):(lines.length<=2?46:30),100*(W-30)/w100[i]));
+  const gap=6, tot=sizes.reduce((a,z)=>a+CAP.MontBk*z,0)+gap*(lines.length-1), H=tot+28;
+  rrect(ctx,x,y,W,H,14,dark?ORANGE:'#000'); if(dark) color='#000';
+  let yy=y+14; lines.forEach((l,i)=>{ yy+=CAP.MontBk*sizes[i]; drawRuns(ctx,[{text:l,font:F_MBK,size:sizes[i],track:-30}],x+W/2,yy,'center',color); yy+=gap; });
+  return {x,y,w:W,h:H};
+}
 function tagLines(t){ const w=t.toUpperCase().replace(/\s+/g,' ').trim().split(' '); if(w.length<2) return [w.join(' ')];
   let best=null; for(let i=1;i<w.length;i++){ const a=w.slice(0,i).join(' '), b=w.slice(i).join(' '); const d=Math.abs(a.length-b.length); if(!best||d<best.d) best={d,l:[a,b]}; } return best.l; }
 function drawTagBox(ctx,text,x,y,W,color,dark){
@@ -1025,12 +1063,15 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
     ctx.save(); ctx.translate(ax+px,ay+py); ctx.scale(ps,ps); ctx.translate(-ax,-ay); const b=fn(); ctx.restore();
     if(b) LHITS.push({k:slot,type:'price',x:ax+px+(b.x-ax)*ps,y:ay+py+(b.y-ay)*ps,w:b.w*ps,h:b.h*ps}); return b; };
   // limit + tags ("EXCETO ZERO LACTOSE"): boxes stacked, moved/scaled together (ls,lx,ly)
-  const limGroup=(x,y,k0=1)=>{ if(!lim&&!tags.length) return null; const ls=(AJ.ls||1)*k0, lx=AJ.lx||0, ly=AJ.ly||0;
+  // row=true: highlight boxes side by side to the left of the limit (big cells); otherwise stacked under it
+  const limGroup=(x,y,k0=1,row=false)=>{ if(!lim&&!tags.length) return null; const ls=(AJ.ls||1)*k0, lx=AJ.lx||0, ly=AJ.ly||0;
     ctx.save(); ctx.translate(x+lx,y+ly); ctx.scale(ls,ls);
-    let yy=0, w=199; if(lim){ const lb=drawLimit(ctx,A,lim,0,0,hlc,dark,c.color); yy=lb.h+8; }
-    for(const t of tags){ const b=drawTagBox(ctx,t,0,yy,199,lim?hlc:'#fff',dark); yy+=b.h+8; }
+    let yy=0, x0=0, x1=199, hh=0; const col=lim?hlc:ORANGE;
+    if(lim){ const lb=drawLimit(ctx,A,lim,0,0,hlc,dark,c.color); yy=lb.h+8; hh=lb.h; }
+    if(row){ let xr=lim?-8:199; for(const t of tags){ ctx.save(); ctx.globalAlpha=0; const m=drawHltBox(ctx,t,0,0,col,dark); ctx.restore(); xr-=m.w; drawHltBox(ctx,t,xr,0,col,dark); hh=Math.max(hh,m.h); xr-=8; } x0=Math.min(0,xr+8); yy=hh+8; }
+    else for(const t of tags){ const b=drawHltBox(ctx,t,0,yy,col,dark,199); yy+=b.h+8; }
     ctx.restore(); const h=(yy-8)*ls;
-    LHITS.push({k:slot,type:'lim',x:x+lx,y:y+ly,w:w*ls,h}); return {x:x+lx,y:y+ly,w:w*ls,h}; };
+    LHITS.push({k:slot,type:'lim',x:x+lx+x0*ls,y:y+ly,w:(x1-x0)*ls,h}); return {x:x+lx+x0*ls,y:y+ly,w:(x1-x0)*ls,h}; };
   const para=(text,o)=>drawParagraph(ctx,text,{...o,size:o.size*nz,minSize:o.minSize*Math.min(1,nz),maxLines:nz>1?o.maxLines+1:o.maxLines});
   let variant=forced||chooseVariant(c,item,imgs,skin);
   // layout chosen by the user: price left / right / above / below the photo
@@ -1046,7 +1087,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   if(flex) variant=(item.club?'club':'simple')+{left:'Small1',right:'Right',above:'Small2',below:'Below'}[flex];
   const notes=item.notes||(item.note?[item.note]:[]);
   const lim=notes.find(n=>/LIMITE|PRE[CÇ]O DO KG/i.test(n))||null;
-  const tags=notes.filter(n=>/^\s*(EXCETO|LEVE|SOMENTE|APENAS)\b/i.test(n));
+  const tags=itemHlt(item);
   const dy=Math.max(0,(c.h-441)/2);
   const estokBox=(ox,oy,s,bb)=>({x:Math.min(ox,ox+bb[0]*s),y:oy-76*s,w:(Math.max(289,bb[0]+289)-Math.min(0,bb[0]))*s,h:(Math.max(142,bb[1]+200)+76)*s});
   // simple price with the description where the user chose (right / left / above / below the price);
@@ -1113,11 +1154,11 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
     const sw=skin==='igu'?285:300;
     const iw=c.w-sw-10, ih=c.h-24;
     let box={x:X+sw,y:Y+15,w:iw,h:ih};
-    if(lim||tags.length){ const tall={x:X+sw,y:Y+15,w:c.w-sw-219,h:ih}, low={x:X+sw,y:Y+140,w:iw,h:c.h-149}; box= imgArea(imgs,tall)>=imgArea(imgs,low)?tall:low; }
+    if(lim||tags.length){ const tall={x:X+sw,y:Y+15,w:c.w-sw-219,h:ih}, low={x:X+sw,y:Y+150,w:iw,h:c.h-159}; box= (tags.length&&!AJ.lx&&!AJ.ly)||imgArea(imgs,tall)<imgArea(imgs,low)?low:tall; }
     fit(imgs,box);
     if(skin==='igu'){ const sc=Math.min(1,(c.h-30)/400); stack(X+10,Y+(c.h-304*sc)/2+74*sc*0.5,sc); }
     else if(c.h>=430) stack(X+9,Y+82+dy,1,[0,147]); else { const sc=(c.h-14)/428; stack(X+9,Y+(c.h-347*sc)/2+38*sc,sc,[0,147]); }
-    limGroup(X+c.w-209,Y+16);
+    limGroup(X+c.w-209,Y+16,1,true);
   } else if(variant==='clubSmall1'){
     if(skin==='igu'){ fit(imgs,{x:X+192,y:Y+90,w:c.w-198,h:c.h-98}); stack(X+12,Y+56+dy*0.6,0.69); }
     else { fit(imgs,{x:X+198,y:Y+88,w:c.w-206,h:c.h-96}); stack(X+5,Y+55,0.668,[0,141]); }
@@ -1442,6 +1483,12 @@ function procLayout(ctx,st,item,s){
   const lim=limitOf(item);
   const LA=item.adj||{}, LS=LA.ls||1, LX=LA.lx||0, LY=LA.ly||0;
   const limBlock=(x0,y0,w0)=>{ const k0=ops.length; const w=w0*LS, x=x0+(w0-w)/2+LX, y=y0+LY; const hh=limBlock0(x,y,w); for(let i=k0;i<ops.length;i++){} return hh*1; };
+  // destaques (Proner): blue boxes with white text, below the limit
+  const hBlocks=(x,y,w)=>{ let yy=y; const fam="'Alfa'"; for(const t of itemHlt(item)){ const ls=hltLines(t); if(!ls.length) continue; if(yy>y) yy+=F*0.05;
+      const zs=ls.map(l=>Math.min(/\d/.test(l)&&l.length<=8?F*0.3:F*0.16,(w*0.86)/mtx(ctx,l,fam,100).w*100)); const as=ls.map((l,i)=>mtx(ctx,l,fam,zs[i]).asc);
+      const bh=as.reduce((a,b)=>a+b,0)+F*0.05*(ls.length-1)+F*0.12; ops.push({box:true,x,y:yy,w,h:bh,col:'blue'});
+      let ty=yy+F*0.06; ls.forEach((l,i)=>{ ty+=as[i]; ops.push({t:l,fam,size:zs[i],x:x+w/2,y:ty,col:'#ffffff',align:'center'}); ty+=F*0.05; }); yy+=bh; }
+    return yy-y; };
   const limBlock0=(x,y,w)=>{ // returns height
     const fam="'Alfa'"; const l1='LIMITE DE', l3='POR CLIENTE';
     const k1=w/mtx(ctx,l1,fam,100).w*100, k3=w/mtx(ctx,l3,fam,100).w*100, k2=(w*0.86)/mtx(ctx,lim,fam,100).w*100;
@@ -1474,6 +1521,7 @@ function procLayout(ctx,st,item,s){
     row(cx-rowW/2,boxY+padT,'#ffffff');
     let h=Math.max(boxY+bh,ty+th);
     if(lim){ h+=F*0.07; h+=limBlock(cx-bw*0.4,h,bw*0.8); }
+    if(itemHlt(item).length){ h+=F*0.07; h+=hBlocks(cx-bw*0.4,h,bw*0.8); }
     return {w:W,h,ops,box:[bx,boxY,bw,bh]};
   }
   // simple
@@ -1491,6 +1539,7 @@ function procLayout(ctx,st,item,s){
   row(rx,ry,'ink');
   lines.forEach((l,i)=>ops.push({t:l,fam:S.nFam,size:nS,x:nx,y:ny+i*lh+nS*0.95,col:'ink',align:al}));
   if(lim){ const lw=Math.max(rowW*0.8,F*1.1); H+=F*0.1; H+=limBlock((W-lw)/2,H,lw); }
+  if(itemHlt(item).length){ const lw=Math.max(rowW*0.8,F*1.1); H+=F*0.1; H+=hBlocks((W-lw)/2,H,lw); }
   return {w:W,h:H,ops};
 }
 function procDraw(ctx,A,L,x,y){
@@ -1537,7 +1586,9 @@ function drawStamp(ctx,A,st,item,x,y,s){
   if(P.name){ const L=nameLayout(ctx,P.name,item,ax,ay,s,!!club); drawNameL(ctx,L); bot=Math.max(bot,L.bottom); }
   const lim=(item.notes||[]).find(n=>/LIMITE/i.test(n));
   ADJ=false;
-  if(lim){ const LA=item.adj||{}; const w=(Q.bbox[2]-Q.bbox[0])*s*(LA.ls||1); drawTag(ctx,lim.replace(/\s+/g,' '),x+(LA.lx||0),bot+4+(LA.ly||0),Math.max(150,w),'#d4001c','#fff'); }
+  { const LA=item.adj||{}; const w=Math.max(150,(Q.bbox[2]-Q.bbox[0])*s*(LA.ls||1)); let yy=bot+4+(LA.ly||0);
+    if(lim){ const r=drawTag(ctx,lim.replace(/\s+/g,' '),x+(LA.lx||0),yy,w,'#d4001c','#fff'); yy+=r.h+5; }
+    for(const t of itemHlt(item)){ const r=drawHltBox(ctx,t,x+(LA.lx||0),yy,'#ffffff',false,Math.min(w,220)); yy+=r.h+5; } }
 }
 function asOwn(T,item,where){ if(!item.club) return item; const has= where==='grid'? (T.grid&&T.grid.recipes.club) : T.capa.club; return has? item : {...item,price:item.club,club:null}; }
 function stampFor(T,item,where){
@@ -2264,7 +2315,7 @@ async function shareGrids(gis){
 const JOB={key:'',timer:null};
 function sigOf(g){
   return JSON.stringify([ g.tpl, g.kind, g.bd, $('#in-cities')?.value, $('#in-from')?.value, $('#in-to')?.value,
-    g.items.filter(i=>i.slot&&!i.removed).map(i=>[i.slot,i.name,i.unit,i.price,i.club,i.note,i.imgIds,i.rot,i.variant,i.adj,i.iadj,i.namePos,i.sh]).sort(), g.nameCase, g.nameSize ]);
+    g.items.filter(i=>i.slot&&!i.removed).map(i=>[i.slot,i.name,i.unit,i.price,i.club,i.note,i.imgIds,i.rot,i.variant,i.adj,i.iadj,i.namePos,i.sh,i.hlt]).sort(), g.nameCase, g.nameSize ]);
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,at:Date.now(),cities:$('#in-cities').value,from:$('#in-from').value,to:$('#in-to').value,
@@ -2698,7 +2749,7 @@ async function imgsFor(it){
 }
 async function gridData(g){
   const slots={};
-  for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh},imgs,variant:it.variant||undefined}; }
+  for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh,hlt:it.hlt},imgs,variant:it.variant||undefined}; }
   const T=activate(g);
   if(T&&T.kind==='replay'){ const v=g.gvalidity||{from:$('#in-from').value||'__/__',to:$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize}; }
   const bev=!!(g.bebidas&&TPL.bebidas);
@@ -2838,6 +2889,7 @@ function buildRows(gi){
           el('button',{class:'hlb'+(it.hl?' on':''),title:'Produto em destaque (amarelo na planilha) vai para a caixa laranja',onclick:()=>toggleHl(gi,it)},it.hl?'★ destaque':'☆ destaque')),
         imgAdjUI(gi,it),
         priceAdjUI(gi,it),
+        hltUI(gi,it),
         limitAdjUI(gi,it),
         tplOfGrid(g).kind==='replay'?shadowAdjUI(gi,it):null,
         it.note?el('div',{class:'note'},'Obs. da planilha: '+it.note):null,
@@ -2934,8 +2986,20 @@ function shadowAdjUI(gi,it){
   return el('div',{class:'adj'},el('b',{},'Sombra:'),' tamanho ',rng('s',0.2,2,0.02,a.s??1,'Largura da sombra'),' Y ',rng('y',-150,80,1,a.y||0,'Subir/descer a sombra'),' força ',rng('a',0,2,0.05,a.a??1,'Força da sombra (0 = sem sombra)'),lab,
     el('button',{class:'lnk',onclick:()=>{ it.sh=null; remember(it,{sh:null}); buildRows(gi); renderSoon(gi); }},'↺'));
 }
+// destaques: caixinhas no estilo do limite. Sugestões vêm das observações da planilha/texto e do que está entre parênteses no nome
+function hltUI(gi,it){
+  const act=itemHlt(it), auto=autoHlt(it), par=[...String(it.name||'').matchAll(/\(([^)]+)\)/g)].map(m=>hltClean(m[1])).filter(Boolean);
+  const cand=[...new Set([...act,...auto,...par])];
+  const set=v=>{ it.hlt=v; buildRows(gi); renderSoon(gi); };
+  const add=()=>{ const v=hltClean(inp.value); if(!v) return; set([...act.filter(x=>x!==v),v]); };
+  const inp=el('input',{class:'hin',placeholder:'novo destaque (ex.: SEM DORSAL, 550ML)',onkeydown:e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } }});
+  return el('div',{class:'adj hlt'},el('b',{},'Destaques:'),
+    ...cand.map(t=>{ const on=act.includes(t); return el('button',{class:'hchip'+(on?' on':''),title:on?'Na arte (clique para tirar)':'Clique para colocar na arte',onclick:()=>set(on?act.filter(x=>x!==t):[...act,t])},(on?'✓ ':'+ ')+t); }),
+    inp,el('button',{class:'lnk',onclick:add},'adicionar'),
+    Array.isArray(it.hlt)?el('button',{class:'lnk',title:'Voltar ao automático (observações da planilha)',onclick:()=>{ delete it.hlt; buildRows(gi); renderSoon(gi); }},'↺'):null);
+}
 function limitAdjUI(gi,it){
-  if(!(it.notes||[]).some(x=>/LIMITE|PRE[CÇ]O DO KG|^\s*(EXCETO|LEVE|SOMENTE|APENAS)\b/i.test(x))) return null;
+  if(!(it.notes||[]).some(x=>/LIMITE|PRE[CÇ]O DO KG/i.test(x))&&!itemHlt(it).length) return null;
   const a=it.adj||{};
   const set=(k,v)=>{ it.adj={s:1,x:0,y:0,...(it.adj||{}),[k]:v}; renderSoon(gi); lab.textContent=fmt(); };
   const fmt=()=>{ const b=it.adj||{}; return `${Math.round((b.ls||1)*100)}% · X ${b.lx||0} · Y ${b.ly||0}`; };
