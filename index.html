@@ -132,7 +132,7 @@ dialog h3{font-size:16px}
 #toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:9} .toast{background:#2a2c31;border:1px solid var(--line2);color:var(--ink);padding:10px 14px;border-radius:11px;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.5)} .toast.err{background:#3a1d1b;border-color:rgba(255,107,94,.5)}
 .tbtn{margin-left:8px;background:var(--or);color:#fff;border:0;border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit}
 #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--mut);font-size:16px;z-index:10}
-.jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsearch{width:100%;margin:2px 0 8px;padding:9px 11px} .jren{flex:1;width:100%;font-weight:700} .jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:#2c2e33;border-radius:10px;border:2px solid var(--bg)} ::-webkit-scrollbar-track{background:transparent}
 body.mobile .desk{display:none!important}
 @media (max-width:1000px){.steps{grid-template-columns:1fr}.gb{grid-template-columns:1fr}.pv{position:static;border-right:0;border-bottom:1px solid var(--line)}}
@@ -161,6 +161,7 @@ body.mobile .desk{display:none!important}
       <label class="btn">ou enviar .xlsx<input type="file" id="file-xlsx" accept=".xlsx,.docx,.odt"></label><button class="btn" id="btn-paste">Colar texto das ofertas</button><button class="btn" id="btn-jobs" title="Reabrir um trabalho já feito, mesmo sem a planilha">Trabalhos anteriores</button></div>
       <select id="in-xlsx" hidden style="width:100%"></select>
       <label class="tplrow">Modelo<select id="in-tpl"></select></label>
+      <label class="tplrow">Nome<input id="in-jobname" placeholder="Nome desta oferta (ex.: Proner Ofertão 28/10)" disabled></label>
       <span class="st" id="st-dir"></span><span class="st" id="st-sheet">Também dá para arrastar a planilha para esta janela.</span>
     </div>
     <div class="step" id="step2"><h3><b>2</b>Banco de produtos<button class="sw on" data-step="step2" title="Mostrar/esconder"></button></h3>
@@ -2341,7 +2342,7 @@ function sigOf(g){
     g.items.filter(i=>i.slot&&!i.removed).map(i=>[i.slot,i.name,i.unit,i.price,i.club,i.note,i.imgIds,i.rot,i.variant,i.adj,i.iadj,i.namePos,i.sh,i.hlt,i.hadj]).sort(), g.nameCase, g.nameSize ]);
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
-function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,at:Date.now(),cities:$('#in-cities').value,from:$('#in-from').value,to:$('#in-to').value,
+function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),cities:$('#in-cities').value,from:$('#in-from').value,to:$('#in-to').value,
   grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
@@ -2357,19 +2358,28 @@ async function openJobsDialog(){
   box.append(el('div',{class:'st',style:'margin-bottom:6px'},JOBS.dir?`Guardados em "${JOBS.dir.name}"${JOBS.dir instanceof GDir?' (Google Drive)':''} e neste navegador.`:'Guardados só neste navegador. ',
     JOBS.dir?null:(window.showDirectoryPicker?el('button',{class:'lnk',onclick:pickJobsFolder},'Guardar também numa pasta do Google Drive (G:\\Meu Drive\\Ofertas anteriores)'):el('button',{class:'lnk',onclick:()=>{ $('#jobs').close(); googleConnect(); }},'Entrar com Google para ver os trabalhos do Drive'))));
   if(!jobs.length){ box.append(el('div',{class:'st'},'Nenhum trabalho guardado ainda.')); return; }
-  for(const [k,j] of jobs.slice(0,60)){
+  const q=el('input',{class:'jsearch',placeholder:'Buscar pelo nome…',oninput:()=>{ const v=norm(q.value); box.querySelectorAll('.jobrow').forEach(r=>{ r.hidden=v&&!norm(r.dataset.n).includes(v); }); }});
+  box.append(q); setTimeout(()=>q.focus(),50);
+  for(const [k,j] of jobs.slice(0,80)){
+    const sheet=k.slice(4), title=j.title||'';
+    const rename=()=>{ const inp=el('input',{class:'jren',value:title||'',placeholder:'Nome desta oferta'});
+      const save=async()=>{ const v=inp.value.trim(); j.title=v; await IDB.set('job:'+sheet,j); if(JOBS.dir){ try{ await writeJson(JOBS.dir,jobFile(sheet),j); }catch(e){} }
+        if(S.sheetName===sheet){ S.jobTitle=v; $('#in-jobname').value=v; } nm.textContent=v||sheet; row.dataset.n=(v||'')+' '+sheet; inp.replaceWith(nm); };
+      inp.onkeydown=e=>{ if(e.key==='Enter') save(); if(e.key==='Escape') inp.replaceWith(nm); }; inp.onblur=save; nm.replaceWith(inp); inp.focus(); inp.select(); };
+    const nm=el('b',{title:'Clique para renomear',style:'cursor:text',onclick:rename},title||sheet);
     const n=j.grids.reduce((a,g)=>a+g.items.filter(i=>!i.removed).length,0);
     const files=j.grids.map(g=>g.savedAs).filter(Boolean);
-    const row=el('div',{class:'jobrow'},
-      el('div',{class:'ji'},el('b',{},j.sheet||k.slice(4)),el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.grids.length} arte(s) · ${n} produtos${j.from?` · validade ${j.from}${j.to&&j.to!==j.from?' a '+j.to:''}`:''}`),
+    const row=el('div',{class:'jobrow','data-n':title+' '+sheet},
+      el('div',{class:'ji'},nm,title?el('div',{class:'st'},sheet):null,el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.grids.length} arte(s) · ${n} produtos${j.from?` · validade ${j.from}${j.to&&j.to!==j.from?' a '+j.to:''}`:''}`),
         files.length?el('div',{class:'st'},'Salvas como: '+files.join(', ')):null),
+      el('button',{class:'btn',onclick:rename},'Renomear'),
       el('button',{class:'btn pri',onclick:async()=>{ $('#jobs').close(); try{ await openSavedJob(k.slice(4),j); }catch(e){ console.error(e); toast('Não consegui abrir: '+e.message,'err'); } }},'Abrir'),
       el('button',{class:'lnk rm',title:'Tirar da lista (as artes já salvas não são apagadas)',onclick:async()=>{ await IDB.del(k); if(JOBS.dir){ try{ await JOBS.dir.removeEntry(jobFile(k.slice(4))); }catch(e){} } row.remove(); }},'✕'));
     box.append(row);
   }
 }
 async function openSavedJob(name,job){
-  S.sheet=null; S.sheetName=name;
+  S.sheet=null; S.sheetName=name; S.jobTitle=job.title||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
@@ -2713,6 +2723,7 @@ async function applySheet(sh,name,replayFile,forced,reload){
   if(!sh.grids.length) throw new Error('Não encontrei produtos com preço no arquivo.');
   S.sheet=sh; S.sheetName=name;
   const job0=await IDB.get('job:'+name);
+  S.jobTitle=(job0&&job0.title)||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   let T0;
   if(replayFile){
     const allTxt=sh.title+' '+sh.grids.map(g=>g.tplHint+' '+g.items.map(i=>i.raw).join(' ')).join(' ');
@@ -3151,6 +3162,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   reopenJobsFolder(false);
   document.querySelectorAll('.sw').forEach(b=>{ const id=b.dataset.step, st=$('#'+id); let off=false; try{ off=localStorage.getItem('min:'+id)==='1'; }catch(_){}
     const set=v=>{ st.classList.toggle('min',v); b.classList.toggle('on',!v); try{ localStorage.setItem('min:'+id,v?'1':'0'); }catch(_){} }; set(off); b.onclick=()=>set(!st.classList.contains('min')); });
+  $('#in-jobname').addEventListener('input',e=>{ S.jobTitle=e.target.value.trim(); jobChanged(); });
   $('#btn-jobs').onclick=openJobsDialog; $('#jobs-close').onclick=()=>$('#jobs').close();
   $('#btn-paste').onclick=()=>{ const sel=$('#pt-tpl'); sel.innerHTML='';
     sel.append(el('option',{value:''},'Detectar pelo texto'));
