@@ -2414,7 +2414,7 @@ function updateSaveState(){
     b.textContent=!g.savedAs?'ainda não salva':d?`alterada · salvar de novo (${g.savedAs})`:`salva como ${g.savedAs} ✓`;
     b.className='badge '+(!g.savedAs?'':d?'warn':'ok');
   });
-  const bt=$('#btn-save'); const send=!S.dir&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
+  const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
   S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; });
@@ -3127,6 +3127,17 @@ async function saveAll(){
       try{ const fh=await S.dir.getFileHandle(S.sheetName.replace(/\.xlsx$/i,'')+'.gerador.json',{create:true}); const w=await fh.createWritable(); await w.write(JSON.stringify(jobSnapshot())); await w.close(); }catch(e){}
       jobChanged(); updateSaveState(); toast(`Salvo: ${done.join(', ')}`); return;
     }catch(e){ toast('Não consegui salvar na pasta ('+e.message+'). Vou baixar os arquivos.','err'); }
+  }
+  // computador sem a pasta ELEMENTOS aberta: salva os PNG numa pasta escolhida (lembrada para as próximas vezes)
+  if(!document.body.classList.contains('mobile')&&window.showDirectoryPicker){
+    let d=null; try{ d=await IDB.get('dir.save'); if(d&&await d.requestPermission({mode:'readwrite'})!=='granted') d=null; }catch(e){ d=null; }
+    if(!d){ try{ d=await window.showDirectoryPicker({id:'salvar-artes',mode:'readwrite',startIn:'pictures'}); await IDB.set('dir.save',d); }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); return; } }
+    const done=[];
+    try{ for(const gi of todo){ const g=S.grids[gi]; const n=g.savedAs||artFileName(gi); const fh=await d.getFileHandle(n,{create:true}); const w=await fh.createWritable(); await w.write(await gridBlob(gi)); await w.close(); g.savedAs=n; g.savedSig=sigOf(g); done.push(n); } }
+    catch(e){ toast('Não consegui salvar na pasta: '+e.message,'err'); }
+    jobChanged(); updateSaveState();
+    if(done.length) toastAction(`Salvo em "${d.name}": ${done.join(', ')}`,'Trocar pasta',async()=>{ await IDB.del('dir.save'); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); toast('Clique em Salvar de novo e escolha a nova pasta.'); });
+    return;
   }
   if(canShareFiles()){ // celular: manda as artes direto (WhatsApp etc.)
     const ok=await shareGrids(todo); if(ok){ for(const gi of todo){ const g=S.grids[gi]; g.savedAs=g.savedAs||artFileName(gi); g.savedSig=sigOf(g); } jobChanged(); updateSaveState(); }
