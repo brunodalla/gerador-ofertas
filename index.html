@@ -723,13 +723,16 @@ const F_ANTON="'AntonX'", F_MR="'MontR'", F_MSB="'MontSB'", F_MBK="'MontBk'", F_
 const CAP={AntonX:0.735, MontR:0.70, MontSB:0.70, MontBk:0.70, MontB:0.70, MontXB:0.70, OpenSB:0.714, OpenXB:0.714, OpenR:0.714, OpenB:0.714, MyriadR:0.65, PopBk:0.70};
 
 function setFont(ctx,fam,size,track){ ctx.font=`${size}px ${fam}`; ctx.letterSpacing=(track*size/1000)+'px'; }
-function measureRuns(ctx,runs){ let w=0; for(const r of runs){ setFont(ctx,r.font,r.size,r.track||0); r._w=ctx.measureText(r.text).width; w+=r._w; } return w; }
+// a unit run like "CADA 100G" or "KG/UND" (last run of a price line) is drawn in two stacked lines
+const stackOf=(r,i,runs)=>i===runs.length-1&&i>0&&typeof unitLines==='function'?unitLines(r.text):null;
+function measureRuns(ctx,runs){ let w=0; runs.forEach((r,i)=>{ const L=stackOf(r,i,runs); if(L){ setFont(ctx,r.font,r.size*0.72,r.track||0); r._w=Math.max(...L.map(t=>ctx.measureText(t).width)); r._st=L; } else { setFont(ctx,r.font,r.size,r.track||0); r._w=ctx.measureText(r.text).width; r._st=null; } w+=r._w; }); return w; }
 function drawRuns(ctx,runs,x,y,align='left',color=INK,opts={}){
   const w=measureRuns(ctx,runs);
   let cx = align==='center'? x-w/2 : align==='right'? x-w : x;
   const x0=cx;
   ctx.fillStyle=color; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   for(const r of runs){
+    if(r._st){ setFont(ctx,r.font,r.size*0.72,r.track||0); ctx.fillText(r._st[1],cx,y); ctx.fillText(r._st[0],cx,y-r.size*0.72*0.86); cx+=r._w; continue; }
     setFont(ctx,r.font,r.size,r.track||0);
     if(opts.italic){ ctx.save(); ctx.translate(cx,y); ctx.transform(1,0,-opts.italic,1,0,0); ctx.fillText(r.text,0,0); ctx.restore(); }
     else ctx.fillText(r.text,cx,y);
@@ -2972,7 +2975,8 @@ function buildRows(gi){
     const nameIn=el('textarea',{class:'nm',rows:2,placeholder:'Nome do produto (como na planilha)',onchange:e=>onNameChange(gi,it,e.target.value)}); nameIn.value=it.name;
     const pIn=el('input',{class:'pr',value:it.price!=null?it.price.toFixed(2):'',onchange:e=>{ it.price=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
     const cIn=el('input',{class:'pr',placeholder:'—',value:it.club!=null?it.club.toFixed(2):'',onchange:e=>{ it.club=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
-    const uSel=el('select',{class:'un',onchange:e=>{ it.unit=e.target.value; buildRows(gi); renderSoon(gi); }},...['UND','KG','KG/UND','UND/KG'].map(u=>el('option',{value:u,selected:it.unit===u},u)));
+    const cur=(unitLines(it.unit||'')||[])[0]==='CADA'?'CADA 100G':it.unit;
+    const uSel=el('select',{class:'un',onchange:e=>{ it.unit=e.target.value; delete it.punit; delete it.cunit; buildRows(gi); renderSoon(gi); }},...['UND','KG','KG/UND','UND/KG','CADA 100G'].map(u=>el('option',{value:u,selected:cur===u},u)));
     const varSel=tplOfGrid(g).kind==='replay'?null:el('select',{class:'var',id:`var-${gi}-${it.i}`,onchange:e=>{ it.variant=e.target.value; remember(it,{variant:it.variant}); renderSoon(gi); }},
       el('option',{value:''},'Automático'),...Object.entries(VAR_LABEL).filter(([k])=>it.club?k.startsWith('club'):k.startsWith('simple')).map(([k,v])=>el('option',{value:k,selected:it.variant===k},v)));
     const thumbs=el('div',{class:'th',id:`th-${gi}-${it.i}`});
