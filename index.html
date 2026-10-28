@@ -1463,7 +1463,8 @@ function stampPrep(ctx,st,item,s){
         const g1=parts.cents&&parts.unit?Math.max(2,big.size*0.035):0;
         const need=ks.reduce((t,k)=>t+effH(k),0)+g1, avail=sp[1]-g-top;
         const k0=Math.max(0.55,Math.min(1,avail/need));
-        let y=top; const left=Math.max(sp[0],xr-aw/s-2);
+        let y=top; setFont(ctx,f.font,f.size,f.track); const mw=ctx.measureText(lt), mi=ctx.measureText(lt.slice(0,-1)), digR=xr-mw.width/s+mi.actualBoundingBoxRight/s;   // right ink edge of the last digit ("7" leans over the dot)
+        const left=Math.max(sp[0],digR+Math.max(3,big.size*0.04));
         for(const k of ks){ const q=parts[k], w=(q.rb[2]-q.rb[0])*k0, h=(q.rb[3]-q.rb[1])*k0, eh=effH(k)*k0;
           parts[k]={...q,runs:q.runs.map(r=>({...r,size:r.size*k0})),rb:[left,y,left+w,y+h],just:0}; y+=eh+g1; }
         bbox[2]=Math.max(bbox[2],...ks.map(k=>parts[k].rb[2]));
