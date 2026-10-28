@@ -1442,25 +1442,31 @@ function stampPrep(ctx,st,item,s){
   const grow=(k,txt)=>{ const q=parts[k]; if(!q) return; const now=runsW(ctx,[{...q.runs[0],t:txt}],s)/s, was=runsW(ctx,q.runs,s)/s, d=now-was; if(d<=0) return;
     const rb=[...q.rb]; if(q.just===1) rb[0]-=d; else if(q.just===2){ rb[0]-=d/2; rb[2]+=d/2; } else rb[2]+=d; parts[k]={...q,rb}; };
   if(parts.unit){ const per=club?item.cunit:item.punit; const u0=parts.unit.text.replace(/[\r\n]+$/,''); let tt=(per||item.unit||'UND'); if(u0===u0.toLowerCase()) tt=tt.toLowerCase(); if(!unitLines(tt)) grow('unit',tt); }
-  // the dot/comma of the price must never sit under the cents or the unit: if they touch, both move right of it
+  // dot/comma under the cents: cents on top (aligned with the top of the number), unit below them and the dot
+  // below the unit, never touching (Destak "Semana do Preço Baixo" reference); they shrink a bit if needed
   if(parts.int&&intRuns&&(parts.cents||parts.unit)){
     const last=intRuns[intRuns.length-1], lt=(last.caps?last.t.toUpperCase():last.t).replace(/[\r\n]+$/,''), sep=lt.slice(-1);
     if(/[.,]/.test(sep)){
-      const f=runFont(last,s); setFont(ctx,f.font,f.size,f.track); const m=ctx.measureText(sep), aw=m.width;
+      const f=runFont(last,s); setFont(ctx,f.font,f.size,f.track); const m=ctx.measureText(sep), aw=m.width, md=ctx.measureText(lt.slice(0,-1).replace(/\D/g,'')||'0');
       const big=P.int.runs.reduce((a,r)=>r.size>a.size?r:a,P.int.runs[0]);
       const d=textInk(ctx,P.int.runs.map(r=>r.t).join('').replace(/[\r\n]+$/,'').split(/[\r\n]/).pop(),big,s).desc/s;
       const xr=parts.int.rb[2], base=parts.int.rb[3]-d, x0=xr-aw/s;
       const sp=[x0-m.actualBoundingBoxLeft/s, base-m.actualBoundingBoxAscent/s, x0+m.actualBoundingBoxRight/s, base+m.actualBoundingBoxDescent/s];
-      const g=Math.max(3,big.size*0.05);
-      const ink=k=>{ const q=parts[k]; if(!q) return null; const rb=[...q.rb]; if(k==='unit'){ const per=club?item.cunit:item.punit; if(unitLines(per||item.unit||'')) rb[3]=rb[1]+(rb[3]-rb[1])*1.4; } return rb; };
+      const top=base-md.actualBoundingBoxAscent/s;
+      const g=Math.max(3,big.size*0.08);
+      const ULn=k=>k==='unit'&&unitLines((club?item.cunit:item.punit)||item.unit||'');
+      const effH=k=>{ const q=parts[k]; const h=q.rb[3]-q.rb[1]; return ULn(k)?h*1.4:h; };
+      const ink=k=>{ const q=parts[k]; if(!q) return null; return [q.rb[0],q.rb[1],q.rb[2],q.rb[1]+effH(k)]; };
       const hit=rb=>rb&&rb[0]<sp[2]+g&&rb[2]>sp[0]-g&&rb[1]<sp[3]&&rb[3]>sp[1]-g;
       if(hit(ink('cents'))||hit(ink('unit'))){
-        const lefts=['cents','unit'].filter(k=>parts[k]).map(k=>parts[k].rb[0]);
-        const mv=sp[2]+g-Math.min(...lefts);
-        if(mv>0){ for(const k of ['cents','unit']) if(parts[k]) parts[k]={...parts[k],rb:[parts[k].rb[0]+mv,parts[k].rb[1],parts[k].rb[2]+mv,parts[k].rb[3]]};
-          const r=Math.max(...['cents','unit'].filter(k=>parts[k]).map(k=>parts[k].rb[2]));
-          if(parts.name&&parts.name.rb[0]>=xr-2){ parts.name={...parts.name,rb:[parts.name.rb[0]+mv,parts.name.rb[1],parts.name.rb[2]+mv,parts.name.rb[3]]}; bbox[2]+=mv; }
-          else bbox[2]=Math.max(bbox[2],r); }
+        const ks=['cents','unit'].filter(k=>parts[k]);
+        const g1=parts.cents&&parts.unit?Math.max(2,big.size*0.035):0;
+        const need=ks.reduce((t,k)=>t+effH(k),0)+g1, avail=sp[1]-g-top;
+        const k0=Math.max(0.55,Math.min(1,avail/need));
+        let y=top; const left=Math.max(sp[0],xr-aw/s-2);
+        for(const k of ks){ const q=parts[k], w=(q.rb[2]-q.rb[0])*k0, h=(q.rb[3]-q.rb[1])*k0, eh=effH(k)*k0;
+          parts[k]={...q,runs:q.runs.map(r=>({...r,size:r.size*k0})),rb:[left,y,left+w,y+h],just:0}; y+=eh+g1; }
+        bbox[2]=Math.max(bbox[2],...ks.map(k=>parts[k].rb[2]));
       }
     }
   }
