@@ -816,12 +816,12 @@ function drawClubStack(ctx,A,it,ox,oy,s,bb,dark,nz=1,cell=null){
   // "de" price
   const p=fmtPrice(it.price||0);
   const by=oy+S(n>=3?127:122.95);
-  drawRuns(ctx,[{text:'R$ ',font:F_MBK,size:S(23.56),track:-30},{text:p.int+'.'+p.cents,font:F_MBK,size:S(50.58),track:-30},{text:' ',font:F_MBK,size:S(50.58),track:-90},{text:it.unit,font:F_MBK,size:S(23.56),track:-30}],ox+S(145.4),by,'center',INK);
+  drawRuns(ctx,[{text:'R$ ',font:F_MBK,size:S(23.56),track:-30},{text:p.int+'.'+p.cents,font:F_MBK,size:S(50.58),track:-30},{text:' ',font:F_MBK,size:S(50.58),track:-90},{text:it.punit||it.unit,font:F_MBK,size:S(23.56),track:-30}],ox+S(145.4),by,'center',INK);
   // black box
   const bx=ox+S(bb[0]), byy=oy+S(bb[1]);
   ctx.drawImage(dark?tinted(A.blackbox,'#ff5300'):A.blackbox,bx,byy,S(289),S(200));
   ctx.drawImage(dark?A.clublogo_inv:A.clublogo,bx+S(70),byy+S(10),S(160),S(66));
-  drawClubPrice(ctx,it.club,it.unit,bx,byy,s);
+  drawClubPrice(ctx,it.club,it.cunit||it.unit,bx,byy,s);
 }
 // club price number filling its box: [R$][INT][cents over unit, the dot below them], centred in area A
 function drawClubNumber(ctx,value,unit,A,ink,R){
@@ -2975,8 +2975,11 @@ function buildRows(gi){
     const nameIn=el('textarea',{class:'nm',rows:2,placeholder:'Nome do produto (como na planilha)',onchange:e=>onNameChange(gi,it,e.target.value)}); nameIn.value=it.name;
     const pIn=el('input',{class:'pr',value:it.price!=null?it.price.toFixed(2):'',onchange:e=>{ it.price=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
     const cIn=el('input',{class:'pr',placeholder:'—',value:it.club!=null?it.club.toFixed(2):'',onchange:e=>{ it.club=parsePrice(e.target.value); buildRows(gi); renderSoon(gi); }});
-    const cur=(unitLines(it.unit||'')||[])[0]==='CADA'?'CADA 100G':it.unit;
-    const uSel=el('select',{class:'un',onchange:e=>{ it.unit=e.target.value; delete it.punit; delete it.cunit; buildRows(gi); renderSoon(gi); }},...['UND','KG','KG/UND','UND/KG','CADA 100G'].map(u=>el('option',{value:u,selected:cur===u},u)));
+    const UNITS=['UND','KG','KG/UND','UND/KG','CADA 100G'], norm=u=>u&&(unitLines(u)||[])[0]==='CADA'?'CADA 100G':u;
+    // the club price can have its own unit (ex.: normal per KG, club R$ 3,49 CADA 100G)
+    const uSel=el('select',{class:'un',title:'Unidade do preço normal',onchange:e=>{ it.unit=e.target.value; if(it.punit) delete it.punit; if(it.club==null) delete it.cunit; buildRows(gi); renderSoon(gi); }},...UNITS.map(u=>el('option',{value:u,selected:norm(it.punit||it.unit)===u},u)));
+    const cuSel=it.club!=null?el('select',{class:'un',title:'Unidade do preço do clube',onchange:e=>{ const v=e.target.value; if(v==='') delete it.cunit; else it.cunit=v; buildRows(gi); renderSoon(gi); }},
+      el('option',{value:'',selected:!it.cunit},'clube: igual'),...UNITS.map(u=>el('option',{value:u,selected:!!it.cunit&&norm(it.cunit)===u},'clube: '+u))):null;
     const varSel=tplOfGrid(g).kind==='replay'?null:el('select',{class:'var',id:`var-${gi}-${it.i}`,onchange:e=>{ it.variant=e.target.value; remember(it,{variant:it.variant}); renderSoon(gi); }},
       el('option',{value:''},'Automático'),...Object.entries(VAR_LABEL).filter(([k])=>it.club?k.startsWith('club'):k.startsWith('simple')).map(([k,v])=>el('option',{value:k,selected:it.variant===k},v)));
     const thumbs=el('div',{class:'th',id:`th-${gi}-${it.i}`});
@@ -2989,7 +2992,7 @@ function buildRows(gi){
       slotSel,
       el('div',{class:'imgcol'},thumbs,isOpen?flag:null),
       body||el('div',{class:'info'},el('button',{class:'close',title:'Fechar',onclick:toggle},el('span',{class:'chev up'})),nameIn,
-        el('div',{class:'prices'},el('label',{},'Preço ',pIn),el('label',{},'Clube ',cIn),uSel,varSel,
+        el('div',{class:'prices'},el('label',{},'Preço ',pIn),el('label',{},'Clube ',cIn),uSel,cuSel,varSel,
           el('button',{class:'hlb'+(it.hl?' on':''),title:'Produto em destaque (amarelo na planilha) vai para a caixa laranja',onclick:()=>toggleHl(gi,it)},it.hl?'★ destaque':'☆ destaque')),
         imgAdjUI(gi,it),
         priceAdjUI(gi,it),
