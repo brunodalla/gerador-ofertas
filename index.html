@@ -794,9 +794,11 @@ function imgArea(imgs,box){
 
 // club tag stack. origin = light box top-left; s = scale; bb = black-box offset in stack units
 function tinted(img,color){ const k='_t'+color; if(img[k]) return img[k]; const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const x=c.getContext('2d'); x.drawImage(img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=color; x.fillRect(0,0,c.width,c.height); return img[k]=c; }
-function drawClubStack(ctx,A,it,ox,oy,s,bb,dark,nz=1){
+function drawClubStack(ctx,A,it,ox,oy,s,bb,dark,nz=1,cell=null){
   const S=v=>v*s;
-  ctx.drawImage(A.lightbox, ox, oy, S(289), S(142));
+  // light box: white when the cell behind is the same light grey (it would disappear)
+  const lbx=(cell&&/^#[0-9a-f]{6}$/i.test(cell)&&colDist(cell,'#eeeeee')<45)?tinted(A.lightbox,'#ffffff'):A.lightbox;
+  ctx.drawImage(lbx, ox, oy, S(289), S(142));
   ctx.drawImage(A.pct, ox+S(108), oy+S(-76), S(85), S(88));   // % icon in front of the white box
   // name
   const name=it.name;
@@ -1137,7 +1139,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
     price(bx,by,()=>lay(bx,by,true));
     if(lim||tags.length){ const below=by+d.h+14, fits=side!=='bottom'&&below+118*0.8<Y+c.h; limGroup(fits?bx:X+c.w-10-199*0.62,fits?below:Y+10,fits?0.8:0.62); }
   };
-  const stack=(ox,oy,s,bb)=> price(ox,oy,()=> skin==='igu'? drawIguStack(ctx,A,item,ox,oy,s,dark,c.color,nz) : (drawClubStack(ctx,A,item,ox,oy,s,bb,dark,nz),estokBox(ox,oy,s,bb)));
+  const stack=(ox,oy,s,bb)=> price(ox,oy,()=> skin==='igu'? drawIguStack(ctx,A,item,ox,oy,s,dark,c.color,nz) : (drawClubStack(ctx,A,item,ox,oy,s,bb,dark,nz,c.color),estokBox(ox,oy,s,bb)));
   if(flex&&item.club){
     // price above/below the photo: the two blocks side by side (name + normal price | club price), as in the PSDs
     const split=flex==='above'||flex==='below';
