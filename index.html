@@ -476,7 +476,7 @@ function isYellow(f){
   const r=parseInt(m[1].slice(0,2),16), g=parseInt(m[1].slice(2,4),16), b=parseInt(m[1].slice(4,6),16);
   return r>200&&g>170&&b<140;
 }
-const DESTAQUE_RX=/\bDESTAQUE\b/i;
+const DESTAQUE_RX=/\bDESTAQUE\b(?!\s+(?:NO|NA|NOS|NAS|EM|PARA|AO|DO|DA|DE)\b)/i;   // "DESTAQUE NO 998ML" = caixinha de destaque, não o quadro de destaque
 const MESES={JANEIRO:1,FEVEREIRO:2,MARCO:3,'MARÇO':3,ABRIL:4,MAIO:5,JUNHO:6,JULHO:7,AGOSTO:8,SETEMBRO:9,OUTUBRO:10,NOVEMBRO:11,DEZEMBRO:12};
 function pad2(n){ return String(n).padStart(2,'0'); }
 function parsePrice(v){
@@ -664,16 +664,19 @@ function parseItemLine(line){
 function storeOf(h){ const DAY=/^(SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|DOMINGO|DE\b)/; const m0=/(?:EXCLUSIV\w*|SOMENTE PARA|PARA)\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚÂÊÔ]+(?:\s+[A-ZÇÃÁÉÍÓÚÂÊÔ]+)?)/i.exec(h); if(m0&&DAY.test(m0[1].toUpperCase())) return ''; const m=/(?:EXCLUSIV\w*|SOMENTE PARA|PARA)\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚÂÊÔ ]+?)(?:\s*[-–—]|\s+(?:SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|DOMINGO)|$)/i.exec(h); return m?m[1].trim().toUpperCase():''; }
 const DAYS_RX=/\b(SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|DOMINGO)(-FEIRA)?\b/i;
 // "TERÇA 27.10" -> "TERÇA 27/10" (only on header-like lines, never on product lines)
-function normDates(l){ if(DAYS_RX.test(l)||/EXCLUSIV|SOMENTE|^OFERTAS?\b|V[AÁ]LID/i.test(l)||(l===l.toUpperCase()&&!/[a-zà-ú]/.test(l)&&!/\d[.,]\d{2}\s*(KG|UN|UND)?\s*$/i.test(l)&&/[A-Z]{4}/.test(l))) return l.replace(/\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/g,'$1/$2'); return l; }
+function normDates(l){ if(DAYS_RX.test(l)||/EXCLUSIV|SOMENTE|^OFERTAS?\b|V[AÁ]LID/i.test(l)||(l===l.toUpperCase()&&!/[a-zà-ú]/.test(l)&&!/\d[.,]\d{2}\s*(KG|UN|UND)?\s*$/i.test(l)&&/[A-Z]{4}/.test(l))) return l.replace(/\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/g,(m,a,b)=>(+b>12||+a>31)?m:a+'/'+b); return l; }
 function isCampaignHeader(l){ return /\d{1,2}\/\d{1,2}/.test(l) && !PRICE_RX.test(l.replace(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/g,'')) && l===l.toUpperCase() && !/^(GRID|CAPA|DESTAQUE)/i.test(l.trim()); }
 // generic text offer -> {title, validity, grids:[{label,items,kind,band,tplHint}]}
 function parseTextOffers(lines,fname){
   // "NOME" + next line "14,99" -> one line
-  const L0=lines.map(l=>(l||'').replace(/\s+/g,' ').trim()); const merged=[];
+  // "BATATA KG.......5.99/$4.99 DESTAQUE": dot leaders out, "normal/clube" pair -> "normal CLUBE clube"
+  const pre=l=>String(l||'').replace(/\.{3,}|…+|_{3,}/g,' ')
+    .replace(/(\d{1,4})[.,](\d{2})\s*\/\s*(R?\$)?\s*(\d{1,4})[.,](\d{2})(?!\d)/g,(m,a,b,cur,c,d)=>(cur||+b>12||+d>12||+a>31||+c>31)?`${a},${b} CLUBE ${c},${d}`:m);
+  const L0=lines.map(l=>pre(l).replace(/\s+/g,' ').trim()); const merged=[];
   for(let i=0;i<L0.length;i++){ const a=L0[i]; let j=i+1; while(j<L0.length&&!L0[j]&&j-i<2) j++;
     if(a&&j<L0.length&&/^(R\$\s*)?\d{1,4}[.,]\d{2}\s*(\w{0,3})$/i.test(L0[j])&&!/\d[.,]\d{2}/.test(a)){ merged.push(a+' '+L0[j]); i=j; } else merged.push(a); }
   lines=merged.map(normDates);
-  const arts=[]; let camp=null, sec=null, title='', validity=null;
+  const arts=[]; let camp=null, sec=null, title='', validity=null, cities='';
   const newSec=(label,kind,band)=>{ sec={label,items:[],kind,band:band||(camp&&camp.band)||'',camp}; arts.push(sec); };
   for(let raw of lines){
     const l=raw.replace(/\s+/g,' ').trim();
@@ -687,9 +690,14 @@ function parseTextOffers(lines,fname){
         ||(/\d{1,2}\/\d{1,2}/.test(l)&&(DAYS_RX.test(l)||/EXCLUSIV|SOMENTE/i.test(l))&&!/:\s*$/.test(l));
       if(hdr){
         camp={title:l,validity:parseValidity(l)||parseLooseDates(l),band:/EXCLUSIV|SOMENTE/i.test(l)?storeOf(l.toUpperCase()):''}; if(!title){ title=l; validity=camp.validity; } sec=null; continue; }
+      if(/^OFERTAS?\s+V[AÁ]LID|^V[AÁ]LID[OA]S?\b/i.test(l)&&!/EXCLUSIV|SOMENTE/i.test(l)){
+        const v=parseValidity(l)||parseLooseDates(l);
+        if(v&&v.from){ validity=v; if(sec) sec.validity=sec.validity||v; } else cities=cities||l;
+        continue; }
       const lastIt=sec&&sec.items[sec.items.length-1]; if(lastIt&&looksNote(l)&&!/:\s*$/.test(l)){ addNote(lastIt,l); continue; }
       const kind=/GRID/i.test(l)?'grid':/CAPA/i.test(l)?'capa':null;
       const band=/EXCLUSIV|SOMENTE/i.test(l)?storeOf(l.toUpperCase()):'';
+      if(!title) title=l.replace(/[:*]/g,'').trim();
       newSec(l.replace(/[:*]/g,'').trim(),kind,band); sec.explicit=true; if(/PADARIA|\bP[ÃA]O\b/i.test(l)) sec.pao=true; continue;
     }
     { const lastIt=sec&&sec.items[sec.items.length-1]; if(lastIt&&/NESTA EMBALAGEM|SAI POR|\bCADA UMA\b/i.test(l)){ addNote(lastIt,l); continue; } }
@@ -701,7 +709,7 @@ function parseTextOffers(lines,fname){
   for(const a of arts){ if(!a.kind||a.items.length>5) a.kind=a.items.length<=4?'capa':'grid'; if(a.camp&&a.camp.validity) a.validity=a.camp.validity; a.tplHint=(a.camp?a.camp.title:'')+' '+(a.label||'')+' '+(fname||'');
     if(a.items.length&&a.items.every(i=>/P[ÃA]O\s+FRANC/i.test(i.name))) a.pao=true;
     if(a.camp&&a.label!==a.camp.title) a.label=(a.camp.title+' · '+a.label).replace(/\s+/g,' '); }
-  return {title:title||fname,cities:'',validity:validity||parseLooseDates(fname),grids:arts.filter(a=>a.items.length),skipped:[]};
+  return {title:title||fname,cities,validity:validity||parseLooseDates(fname),grids:arts.filter(a=>a.items.length),skipped:[]};
 }
 function parseLooseDates(s){
   s=(s||'').toUpperCase();
@@ -1343,6 +1351,16 @@ function renderArt(ctx,A,T,data){
   const used={};
   for(const k of SLOT_ORDER){ const s=data.slots[k]; const c=L.cells[k]; if(s&&s.item&&c){ const d=cellOf(T,T.slots[k].units); used[k]=renderSlot(ctx,A,V,k,s.item,s.imgs,s.variant,c,c.w!==d.w||c.h!==d.h); } }
   return used;
+}
+// destaque sempre no quadro de destaque: um item marcado como destaque num quadro comum troca de lugar com
+// o item comum que estiver num quadro de destaque (trabalhos feitos com outra versão do modelo, posições trocadas)
+function fixHlSlots(items,T=TPL){
+  if(!T||T.kind==='replay'||!T.hl||!T.hl.length) return 0; let n=0;
+  const act=items.filter(i=>!i.removed);
+  for(const it of act.filter(i=>i.hl&&i.slot&&!T.hl.includes(i.slot))){
+    const k=T.hl.find(s=>{ const o=act.find(x=>x.slot===s); return !o||!o.hl; }); if(!k) break;
+    const o=act.find(x=>x.slot===k); if(o) o.slot=it.slot; it.slot=k; n++; }
+  return n;
 }
 function autoAssign(items,T=TPL){
   if(T&&T.kind==='replay'){ const slots={}; let ord=[...items.filter(i=>i.hl),...items.filter(i=>!i.hl)]; if(window.CUR_KIND==='capa'&&typeof sizeClass==='function') ord=ord.map((it,k)=>[it,k]).sort((a,b)=>(sizeClass(b[0])-sizeClass(a[0]))||(a[1]-b[1])).map(x=>x[0]); ord.forEach((it,i)=>{ if(i<SLOT_ORDER.length) slots[SLOT_ORDER[i]]=it; }); return slots; }
@@ -2479,7 +2497,7 @@ async function openSavedJob(name,job){
     validity:jg.validity||{from:job.from||'',to:job.to||''},items:jg.items.map(ji=>({...ji}))}));
   $('#in-cities').value=job.cities||''; $('#in-cities').dataset.manual=job.cities?'1':'';
   $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
-  S.grids.forEach(g=>{ activate(g); if(g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))) reassignGrid(g); });
+  S.grids.forEach(g=>{ activate(g); if(g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))) reassignGrid(g); else fixHlSlots(g.items,TPL); });
   setStatus('st-sheet',`${name} · trabalho reaberto (${new Date(job.at).toLocaleString('pt-BR')}) · ${S.grids.length} arte(s)`,true);
   buildGridUI(); await renderAll(); updateSaveState();
   toast('Trabalho reaberto. Cole as alterações do cliente em "Colar alterações do cliente (WhatsApp)" e salve: as artes substituem os mesmos arquivos.');
@@ -2704,9 +2722,12 @@ function tplList(){ return Object.values(window.TPLS); }
 const clientOf=s=>/bigolin|\bbigo\b|s[aá]bado\s*b\b/i.test(s||'')?'Bigolin':/destak|tabloide|quinzena|fecha\s*m[eê]s/i.test(s||'')?'Destak':/proner|barat[aã]o|ofert[aã]o|imbat[ií]vel|lebon|catanduvas|capinzal|segunda do clube|mega a[cç]ougue|clube paga/i.test(s||'')?'Proner':/iguatemi/i.test(s||'')?'Iguatemi':/estok/i.test(s||'')?'Shop Estok':null;
 function detectTplFor(hint,name,title){
   const cl=clientOf(name)||clientOf(title)||clientOf(hint);
-  const list=tplList().filter(T=>T.kind==='replay'&&(!cl||T.client===cl));
+  // texto colado também serve para Shop Estok e Iguatemi (modelos de planilha), não só para os modelos de PSD
+  const ok=T=>!T.fixed&&T.id!=='pro_pao'&&(!cl||T.client===cl);
   const rx=T=>new RegExp(T.match,'i');
-  return list.find(T=>rx(T).test(hint||''))||list.find(T=>rx(T).test(title||''))||list.find(T=>rx(T).test(name||''))||list[0]||null;
+  const pick=list=>list.find(T=>rx(T).test(hint||''))||list.find(T=>rx(T).test(title||''))||list.find(T=>rx(T).test(name||''));
+  const rep=tplList().filter(T=>T.kind==='replay'&&ok(T)), all=tplList().filter(ok);
+  return (cl?pick(all):(pick(rep)||pick(all)))||rep[0]||all[0]||null;
 }
 function detectTemplate(title,fname){
   const t=(title||'')+' '+(fname||'');
@@ -2848,7 +2869,7 @@ async function applySheet(sh,name,replayFile,forced,reload){
     S.grids.forEach((g,gi)=>{ const hk=new Set(sh.grids[gi].items.filter(x=>x.hl).map(x=>keyOf(x.raw)));
       g.items.forEach(it=>{ if(!it.added) it.hl=hk.has(keyOf(it.raw0)); });
       activate(g);
-      if((job.v||1)<2||g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))){ const act=g.items.filter(i=>!i.removed); const sl=autoAssign(act); act.forEach(i=>i.slot=''); for(const [k,i] of Object.entries(sl)) i.slot=k; }
+      if((job.v||1)<2||g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))){ const act=g.items.filter(i=>!i.removed); const sl=autoAssign(act); act.forEach(i=>i.slot=''); for(const [k,i] of Object.entries(sl)) i.slot=k; } else fixHlSlots(g.items,TPL);
     }); }
   loadSheetBuffer.fresh=false;
   setStatus('st-sheet',`${name} · ${replayFile?[...new Set(S.grids.map(g=>tplOfGrid(g).name))].join(', '):TPL.client+' '+TPL.name} · ${S.grids.length} arte(s) · ${S.grids.reduce((a,g)=>a+g.items.length,0)} produtos`,true);
