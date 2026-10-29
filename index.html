@@ -133,7 +133,7 @@ dialog h3{font-size:16px}
 #toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:9} .toast{background:#2a2c31;border:1px solid var(--line2);color:var(--ink);padding:10px 14px;border-radius:11px;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.5)} .toast.err{background:#3a1d1b;border-color:rgba(255,107,94,.5)}
 .tbtn{margin-left:8px;background:var(--or);color:#fff;border:0;border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit}
 #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--mut);font-size:16px;z-index:10}
-.jsearch{width:100%;margin:2px 0 8px;padding:9px 11px} .jren{flex:1;width:100%;font-weight:700} .jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsearch{width:100%;margin:2px 0 8px;padding:9px 11px} .jren{flex:1;width:100%;font-weight:700} .jobrow[hidden]{display:none!important} .jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:#2c2e33;border-radius:10px;border:2px solid var(--bg)} ::-webkit-scrollbar-track{background:transparent}
 body.mobile .desk,body.nofs .desk{display:none!important}
 .btn.del{color:var(--bad);border-color:rgba(255,107,94,.35)} .btn.del:hover{background:var(--badbg)}
@@ -1967,7 +1967,7 @@ function drawBand(ctx,T,bd,rect,text){
 }
 function drawBlock(ctx,spec,lines){
   const r=spec.runs[0]; const b=spec.bbox;
-  const n0=spec.text.replace(/\r$/,'').split('\r').length;
+  const n0=spec.text.replace(/[\r\n]+$/,'').split(/\r|\n/).length;   // empty paragraphs at the end of the PSD text don't count as lines
   let k=1; const maxW=(b[2]-b[0])*1.06+20;
   const f=runFont(r,1);
   const wid=l=>{ setFont(ctx,f.font,f.size*k,f.track); return ctx.measureText(r.caps?l.toUpperCase():l).width; };
@@ -2473,8 +2473,9 @@ async function openJobsDialog(){
   box.append(el('div',{class:'st',style:'margin-bottom:6px'},JOBS.dir?`Guardados em "${JOBS.dir.name}"${JOBS.dir instanceof GDir?' (Google Drive)':''} e neste navegador.`:'Guardados só neste navegador. ',
     JOBS.dir?null:(window.showDirectoryPicker?el('button',{class:'lnk',onclick:pickJobsFolder},'Guardar também numa pasta do Google Drive (G:\\Meu Drive\\Ofertas anteriores)'):el('button',{class:'lnk',onclick:()=>{ $('#jobs').close(); googleConnect(); }},'Entrar com Google para ver os trabalhos do Drive'))));
   if(!jobs.length){ box.append(el('div',{class:'st'},'Nenhum trabalho guardado ainda.')); return; }
-  const q=el('input',{class:'jsearch',placeholder:'Buscar pelo nome…',oninput:()=>{ const v=norm(q.value); box.querySelectorAll('.jobrow').forEach(r=>{ r.hidden=v&&!norm(r.dataset.n).includes(v); }); }});
-  box.append(q); setTimeout(()=>q.focus(),50);
+  const q=el('input',{class:'jsearch',placeholder:'Buscar pelo nome…',oninput:()=>{ const ws=norm(q.value).split(/\s+/).filter(Boolean); let n=0; box.querySelectorAll('.jobrow').forEach(r=>{ const t=norm(r.dataset.n); r.hidden=!ws.every(w=>t.includes(w)); if(!r.hidden) n++; }); nf.hidden=n>0; }});
+  const nf=el('div',{class:'st',hidden:true},'Nenhum trabalho com esse nome.');
+  box.append(q,nf); setTimeout(()=>q.focus(),50);
   for(const [k,j] of jobs.slice(0,80)){
     const sheet=k.slice(4), title=j.title||'';
     const rename=()=>{ const inp=el('input',{class:'jren',value:title||'',placeholder:'Nome desta oferta'});
@@ -2484,7 +2485,7 @@ async function openJobsDialog(){
     const nm=el('b',{title:'Clique para renomear',style:'cursor:text',onclick:rename},title||sheet);
     const n=j.grids.reduce((a,g)=>a+g.items.filter(i=>!i.removed).length,0);
     const files=j.grids.map(g=>g.savedAs).filter(Boolean);
-    const row=el('div',{class:'jobrow','data-n':title+' '+sheet},
+    const row=el('div',{class:'jobrow','data-n':[title,sheet,j.from,j.to,...files].filter(Boolean).join(' ')},
       el('div',{class:'ji'},nm,title?el('div',{class:'st'},sheet):null,el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.grids.length} arte(s) · ${n} produtos${j.from?` · validade ${j.from}${j.to&&j.to!==j.from?' a '+j.to:''}`:''}`),
         files.length?el('div',{class:'st'},'Salvas como: '+files.join(', ')):null),
       el('button',{class:'btn',onclick:rename},'Renomear'),
