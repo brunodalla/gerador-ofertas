@@ -514,6 +514,10 @@ function parsePer(v){ // "2,99 A CADA 100G" -> {v:2.99, per:'100G'}
 // a line/row without price right after a product that reads like extra info for it ("SEM DORSAL", "(casco retornável)", "nesta embalagem a unidade sai por 2,89")
 function looksNote(t){ t=String(t||'').trim(); if(!t||t.length>90) return false; return /^[(*•\-–]/.test(t)||/\b(SEM|EXCETO|LIMITE|EMBALAGEM|UNIDADE SAI|RETORN\w*|CASCO|SABORES|CADA|NESTA|DESTACAR|LEVE\s+\d)\b|\d+\s*(ML|L|LT)\b/i.test(t); }
 function addNote(it,t){ t=String(t).replace(/^[(*•\-–\s]+|[)\s]+$/g,'').trim(); if(!t) return; it.notes=[...(it.notes||[]),t]; it.note=it.notes.join(' · '); }
+// datas escritas nas colunas do lado: "VÁLIDO DE 30 DE OUTUBRO A 01 DE NOVEMBRO", "válido de 30.10 a 01.11", "VÁLIDO ATÉ 01/11"
+function sideValidity(t){ const u=String(t||'').replace(/\b(\d{1,2})\.(\d{1,2})\b/g,'$1/$2');
+  if(/AT[EÉ]\s*(O\s+DIA\s+)?\d/i.test(u)&&!/\bDE\s+\d|\d\s*(A|E)\s*\d/i.test(u)){ const v=parseLooseDates(u); return v?{from:'',to:v.to}:null; }
+  return parseValidity(u)||parseLooseDates(u)||null; }
 function parseOfferSheet(rows){
   const title=(rows[0]&&rows[0][0])||'';
   let cities='';
@@ -523,7 +527,9 @@ function parseOfferSheet(rows){
     const r=rows[i]; const a=r[0]==null?'':String(r[0]).trim();
     const rest=r.slice(3).filter(x=>x!=null&&String(x).trim()).map(x=>String(x).trim());
     if(/^\d+\s*GRID/i.test(a)||/^GRID\s*\d+/i.test(a)){
-      const gn=rest.join(' · '); cur={label:a,items:[],note:gn,bebidas:/BEBIDA/i.test(gn),validity:/V[AÁ]LID/i.test(gn)?parseValidity(gn):null}; grids.push(cur); continue; }
+      const gn=rest.join(' · '); cur={label:a,items:[],note:gn,bebidas:/BEBIDA/i.test(gn),validity:/V[AÁ]LID/i.test(gn)?sideValidity(gn):null}; grids.push(cur); continue; }
+    // texto nas colunas do lado, numa linha sem produto logo abaixo do grid ("GRID DE BEBIDAS VÁLIDO DE ... A ...")
+    if(!a&&cur&&rest.length&&/V[AÁ]LID|BEBIDA/i.test(rest.join(' '))){ const t=rest.join(' · '); if(/BEBIDA/i.test(t)) cur.bebidas=true; if(!cur.validity&&/V[AÁ]LID/i.test(t)) cur.validity=sideValidity(t); continue; }
     if(/PRE[CÇ]O/i.test(String(r[1]||''))||/PRE[CÇ]O/i.test(String(r[2]||''))||/^DESCRI[CÇ][AÃ]O$/i.test(a)) continue;
     if(!a) continue;
     if(!cur){ cur={label:'ARTE',items:[],note:'',bebidas:false,validity:null}; grids.push(cur); }
@@ -2494,7 +2500,10 @@ async function openSavedJob(name,job){
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
   S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,
     savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
-    validity:jg.validity||{from:job.from||'',to:job.to||''},items:jg.items.map(ji=>({...ji}))}));
+    validity:jg.validity||{from:job.from||'',to:job.to||''},
+    // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
+    gvalidity:jg.gvalidity||null,valOwn:!!(jg.valOwn||jg.gvalidity),bandOwn:!!jg.bandOwn,bebidas:!!(jg.bebidas||/BEBIDA/i.test(jg.label||'')),title:jg.title||'',cities:jg.cities||'',
+    items:jg.items.map(ji=>({...ji}))}));
   $('#in-cities').value=job.cities||''; $('#in-cities').dataset.manual=job.cities?'1':'';
   $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
   S.grids.forEach(g=>{ activate(g); if(g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))) reassignGrid(g); else fixHlSlots(g.items,TPL); });
@@ -2514,7 +2523,7 @@ function updateSaveState(){
   const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
-  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; });
+  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
   $('#in-cities').value=job.cities||$('#in-cities').value; $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
 }
 function changed(it){ const o=it.orig||{}; return it.name!==o.name||it.price!==o.price||it.club!==o.club||it.unit!==o.unit||it.raw!==it.raw0; }
@@ -2897,7 +2906,7 @@ async function gridData(g){
   const slots={};
   for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh,hlt:it.hlt,hadj:it.hadj},imgs,variant:it.variant||undefined}; }
   const T=activate(g);
-  if(T&&T.kind==='replay'){ const v=g.gvalidity||{from:$('#in-from').value||'__/__',to:$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize}; }
+  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize}; }
   const bev=!!(g.bebidas&&TPL.bebidas);
   let from=$('#in-from').value||'__/__', to=$('#in-to').value||'__/__', band=$('#in-cities').value;
   if(g.gvalidity&&(g.bebidas||g.valOwn)){ from=g.gvalidity.from||from; to=g.gvalidity.to||to; band=bandText(bev?{...TPL,...TPL.bebidas}:TPL,citiesOf(band),from,to); }
