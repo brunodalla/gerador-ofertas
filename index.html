@@ -1297,15 +1297,18 @@ function bandText(T,cities,from,to){
   return base.replace(/\s+-\s+.*$/,'')+' - '+dayPhrase(from,to,parts[1]);
 }
 function datePhrase(src,from,to){
+  from=padDM(from); to=padDM(to);
   const a=dateOf(from), b=dateOf(to)||a; if(!a) return `${from} a ${to}`;
   if(/\d{1,2}\/\d{1,2}/.test(src)) return (from===to||!to)?from:`${from} a ${to}`;
   const conn=/\d\s+e\s+\d/.test(src)?'e':'a';
-  const dd=d=>String(d.getDate()).padStart(/\b0\d/.test(src)?2:1,'0');
+  const dd=d=>String(d.getDate()).padStart(2,'0');
   if(+a===+b) return `${dd(a)} de ${MESES_N[a.getMonth()]}`;
   if(a.getMonth()===b.getMonth()) return `${dd(a)} ${(Math.round((b-a)/864e5)===1)?conn:'a'} ${dd(b)} de ${MESES_N[a.getMonth()]}`;
   return `${dd(a)} de ${MESES_N[a.getMonth()]} a ${dd(b)} de ${MESES_N[b.getMonth()]}`;
 }
+function padDM(v){ return String(v||'').replace(/^\s*(\d{1,2})\/(\d{1,2})/,(m,d,mm)=>d.padStart(2,'0')+'/'+mm.padStart(2,'0')); }   // datas sempre 04/11, nunca 4/11
 function footerFromTemplate(src,from,to){
+  from=padDM(from); to=padDM(to);
   const a=dateOf(from), b=dateOf(to)||a; if(!a) return src;
   const same=!to||from===to;
   const nums=src.match(/\d{1,2}\/\d{1,2}/g);
@@ -1313,7 +1316,7 @@ function footerFromTemplate(src,from,to){
     if(nums.length>=2){ if(same) return src.replace(/(\d{1,2}\/\d{1,2})(\s*a\s*)(\d{1,2}\/\d{1,2})/,from); let i=0; return src.replace(/\d{1,2}\/\d{1,2}/g,m=>i++===0?from:to); }
     return src.replace(/\d{1,2}\/\d{1,2}/,same?from:`${from} a ${to}`);
   }
-  const pad=/\b0\d\b/.test(src)?2:1, dd=d=>String(d.getDate()).padStart(pad,'0'), mes=d=>MESES_N[d.getMonth()];
+  const pad=2, dd=d=>String(d.getDate()).padStart(pad,'0'), mes=d=>MESES_N[d.getMonth()];
   const two=/(\d{1,2})(\s+)(a|e)(\s+)(\d{1,2})(\s+de\s+)([a-zç]+)/i, one=/(\d{1,2})(\s+de\s+)([a-zç]+)/i;
   const consec=Math.round((b-a)/864e5)===1;
   if(a.getMonth()!==b.getMonth()){ const ph=`${dd(a)} de ${mes(a)} a ${dd(b)} de ${mes(b)}`; return two.test(src)?src.replace(two,ph):src.replace(one,ph); }
@@ -3187,13 +3190,17 @@ function hltUI(gi,it){
         el('button',{class:'lnk',onclick:()=>{ if(it.hadj) delete it.hadj[t]; buildRows(gi); renderSoon(gi); }},'↺')); }));
 }
 function limitAdjUI(gi,it){
-  if(!(it.notes||[]).some(x=>/LIMITE|PRE[CÇ]O DO KG/i.test(x))&&!itemHlt(it).length) return null;
   const a=it.adj||{};
+  // texto do limite editável (o cliente pede para trocar): vazio tira o limite
+  const cur=(it.notes||[]).find(x=>/LIMITE/i.test(x))||'';
+  const lt=el('input',{class:'limtxt',value:cur,placeholder:'ex.: LIMITE DE 24UN POR CLIENTE',style:'width:260px',title:'Texto do limite',onchange:e=>{ let v=e.target.value.trim().toUpperCase(); if(v&&!/LIMITE/.test(v)) v='LIMITE DE '+v+(/CLIENTE/.test(v)?'':' POR CLIENTE');
+    const ns=(it.notes||[]).filter(x=>!/LIMITE/i.test(x)); if(v) ns.unshift(v); it.notes=ns; it.note=ns.join(' · '); buildRows(gi); renderSoon(gi); }});
+  if(!cur&&!(it.notes||[]).some(x=>/PRE[CÇ]O DO KG/i.test(x))&&!itemHlt(it).length) return el('div',{class:'adj'},el('b',{},'Limite:'),' ',lt);
   const set=(k,v)=>{ it.adj={s:1,x:0,y:0,...(it.adj||{}),[k]:v}; renderSoon(gi); lab.textContent=fmt(); };
   const fmt=()=>{ const b=it.adj||{}; return `${Math.round((b.ls||1)*100)}% · X ${b.lx||0} · Y ${b.ly||0}`; };
   const lab=el('span',{class:'adjv'},fmt());
   const rng=(k,min,max,step,val,t)=>fine(min,max,step,val,v=>set(k,v),t,/^(ps|ls|ns|s|a)$/.test(k));
-  return el('div',{class:'adj'},el('b',{},'Limite:'),' tamanho ',rng('ls',0.4,1.6,0.02,a.ls||1,'Tamanho do limite'),' X ',rng('lx',-500,500,2,a.lx||0,'Mover o limite para os lados'),' Y ',rng('ly',-700,300,2,a.ly||0,'Mover o limite para cima/baixo'),lab,
+  return el('div',{class:'adj'},el('b',{},'Limite:'),' ',lt,' tamanho ',rng('ls',0.4,1.6,0.02,a.ls||1,'Tamanho do limite'),' X ',rng('lx',-500,500,2,a.lx||0,'Mover o limite para os lados'),' Y ',rng('ly',-700,300,2,a.ly||0,'Mover o limite para cima/baixo'),lab,
     el('button',{class:'lnk',onclick:()=>{ if(it.adj){ delete it.adj.ls; delete it.adj.lx; delete it.adj.ly; } buildRows(gi); renderSoon(gi); }},'↺'));
 }
 function remember(it,patch){ const k=keyOf(it.raw); MEM[k]={...(MEM[k]||{}),...patch}; memSave(MEM); }
