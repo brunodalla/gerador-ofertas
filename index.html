@@ -1672,7 +1672,7 @@ function stampHlts(ctx,A,item,k,gw,cell){ if(!STAMP_END||!itemHlt(item).length) 
   const bg=E.proc?rasterColor(A['r_'+(CUR_T&&procBoxFile(CUR_T))])||'#0b3aa8':'#111111';
   drawHlts(ctx,item,E.x,E.y,1,{W:Math.max(150,Math.min(260,(gw||E.w||200)*0.85)),color:'#ffffff',bg,...(cell?{maxY:cell.y+cell.h-10,maxX:cell.x+cell.w-10,minY:cell.y+10}:{})},HITS,k); }
 function procDraw(ctx,A,L,x,y){
-  const ink=(BGL!=null&&BGL<140)?'#ffffff':'#111111';
+  const ink=(BGL!=null&&BGL<165)?'#ffffff':'#111111';
   for(const o of L.ops){
     if(o.box){ const im=o.img&&A['r_'+o.img]; ctx.fillStyle=o.col==='blue'?rasterColor(im||A['r_'+(CUR_T&&procBoxFile(CUR_T))]):o.col; ctx.beginPath(); ctx.roundRect(x+o.x,y+o.y,o.w,o.h,Math.min(o.h*0.16,18)); ctx.fill(); continue; }
     if(o.img!==undefined||o.fallback){ const im=o.img&&A['r_'+o.img]; if(im) ctx.drawImage(im,x+o.x,y+o.y,o.w,o.h);
