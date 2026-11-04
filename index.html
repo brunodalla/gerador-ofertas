@@ -1473,7 +1473,7 @@ function nameLayout(ctx,part,item,ax,ay,sb,clubMode){
   const nl=nameLines(nameTxt);
   const room=Math.max(nl,tl.length-(priceIdx>=0?1:0));        // lines the PSD had for the name (or more for long names)
   let k=1, lines=wrapRunsLines(ctx,nameTxt,nameRun,s,nameW);
-  while(lines.length>room&&k>0.74){ k*=0.94; lines=wrapRunsLines(ctx,nameTxt,nameRun,s*k,nameW); }
+  // descrições sempre do mesmo tamanho na arte inteira (só a letra escolhida muda o tamanho): nome longo ganha linhas, não encolhe
   if(lines.length>room+1){ lines=wrapRunsLines(ctx,nameTxt,nameRun,s*k,Math.max(b[2]-b[0],110*sb)*1.1*fz); }   // never drop words
   const out=lines.map(l=>({r:nameRun,t:l,k}));
   if(clubMode&&item.price!=null) out.push({r:priceRun,t:'R$ '+item.price.toFixed(2).replace('.',','),k:1});
