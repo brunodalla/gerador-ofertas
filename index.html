@@ -1794,7 +1794,7 @@ function zoneOf(T,bd,kind,band){
     const gt=G?Math.max(4,Math.min(40,G.gapTop)):12, gb=G?Math.max(4,Math.min(60,G.gapBot)):14;
     let y0=top+gt, y1=bd.foot-Math.max(22,gb); if(bd.grid&&!!bd.band===!!band){ y0=bd.grid.zone[1]; y1=bd.grid.zone[3]; }
     if(br) y0=Math.max(y0,br[3]+Math.max(8,gt));   // never under the city band
-    y1=Math.min(y1,bd.foot-18);      // always a little air between the grid and the validity text
+    if(!(bd.grid&&bd.grid.gapBot<=0)) y1=Math.min(y1,bd.foot-18);      // a little air before the validity text, unless the PSD grid touches the footer bar
     return [gx[0],y0,gx[1],y1]; }
   return [26,top+(br?30:14),bd.W-26,bd.foot-44];
 }
