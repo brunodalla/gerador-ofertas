@@ -1123,7 +1123,7 @@ function fillCopies(imgs,box){
 // LHITS: clickable areas of the last render (drag the photo / price / limit on the preview, Ctrl+wheel to resize)
 let LHITS=[], LNAMESIZE=1;
 function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
-  const X=c.x, Y=c.y, skin=T.skin, dark=lum(c.color||'#ffffff')<0.45, ink=dark?'#fff':INK, hlc=lum(T.hlColor||ORANGE)<0.45?ORANGE:(T.hlColor||ORANGE);
+  const X=c.x, Y=c.y, skin=T.skin, INKSEL=(item&&item.ink)||LEG_INK, dark=INKSEL?lum(INKSEL)>0.5:lum(c.color||'#ffffff')<0.56, ink=INKSEL||(dark?'#fff':INK), hlc=lum(T.hlColor||ORANGE)<0.45?ORANGE:(T.hlColor||ORANGE);
   const adj=item.adj||null, AJ=adj||{};
   const nz=LNAMESIZE*(AJ.ns||1);
   const cell={x:c.x,y:c.y,w:c.w,h:c.h};
@@ -1346,7 +1346,9 @@ function drawFixedText(ctx,spec,lines){
   if(spec.maxW){ setFont(ctx,fam,size,spec.track); while(lines.some(l=>ctx.measureText(l).width>spec.maxW)&&size>spec.size*0.6){ size-=0.5; setFont(ctx,fam,size,spec.track); } }
   lines.forEach((ln,i)=>drawRuns(ctx,[{text:ln,font:fam,size,track:spec.track}],spec.x,spec.y+i*size*(spec.lh||1.2),spec.align||'center',spec.color));
 }
+let LEG_INK=null;
 function renderArt(ctx,A,T,data){
+  LEG_INK=data.ink||null;
   ctx.clearRect(0,0,ART_W,ART_H); LHITS=[]; LNAMESIZE=data.nameSize||1;
   const V=data.bebidas&&T.bebidas?{...T,...T.bebidas}:T;
   const base=A['base_'+V.base]; if(base) ctx.drawImage(base,0,0,ART_W,ART_H);
@@ -1396,7 +1398,7 @@ const PSFONT={'AlfaSlabOne-Regular':'Alfa','BebasNeueBold':'BebasB','BebasNeue-B
   'BerlinSansFBDemi-Bold':'BerlinSDB','Anton-Regular':'AntonX','Montserrat-Regular':'MontR','Montserrat-SemiBold':'MontSB','Montserrat-Black':'MontBk','Montserrat-Bold':'MontB',
   'Montserrat-ExtraBold':'MontXB','OpenSans-Regular':'OpenR','OpenSans':'OpenR','OpenSans-Semibold':'OpenSB','OpenSans-SemiBold':'OpenSB','OpenSans-Bold':'OpenB','OpenSans-Extrabold':'OpenXB',
   'OpenSans-ExtraBold':'OpenXB','MyriadPro-Regular':'MyriadR','Lato-Regular':'LatoR','Lato':'LatoR','Poppins-Black':'PopBk','Poppins-ExtraBold':'PopBk'};
-let BGL=null, ADJ=false, NAMECASE='auto', NAMESIZE=1, PRICESIZE=1;   // description case/size chosen per art   // background luminance under the stamp being drawn / adjust this part
+let INKO=null, ARTINK=null; let BGL=null, ADJ=false, NAMECASE='auto', NAMESIZE=1, PRICESIZE=1;   // description case/size chosen per art   // background luminance under the stamp being drawn / adjust this part
 const famOf=f=>`'${PSFONT[f]||'MontSB'}'`;
 const CAPA_K={1:1.25,2:1.05,3:0.9,4:0.78,5:0.7,6:0.64};
 const DAYW=['SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO','DOMINGO'];
@@ -1435,7 +1437,7 @@ function drawRunLine(ctx,runs,x,base,s,just){
   const segs=runs.map(r=>{ const t=(r.caps?r.t.toUpperCase():r.t).replace(/[\r\n]+$/,''); const f=runFont(r,s); setFont(ctx,f.font,f.size,f.track); return {r,t,f,w:ctx.measureText(t).width}; }).filter(z=>z.t);
   const W=segs.reduce((a,z)=>a+z.w,0);
   let cx= just===1? x-W : just===2? x-W/2 : x;
-  for(const z of segs){ setFont(ctx,z.f.font,z.f.size,z.f.track); { const c=z.r.col||[0,0,0]; const L=c[0]*0.3+c[1]*0.59+c[2]*0.11; ctx.fillStyle=(ADJ&&BGL!=null&&Math.abs(L-BGL)<75)?(BGL>140?(L<200?hexOf(c.map(v=>v*0.25)):'#111111'):'#ffffff'):hexOf(c); } ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  for(const z of segs){ setFont(ctx,z.f.font,z.f.size,z.f.track); { const c=z.r.col||[0,0,0]; const L=c[0]*0.3+c[1]*0.59+c[2]*0.11; ctx.fillStyle=INKO?INKO:(ADJ&&BGL!=null&&Math.abs(L-BGL)<75)?(BGL>140?(L<200?hexOf(c.map(v=>v*0.25)):'#111111'):'#ffffff'):hexOf(c); } ctx.textBaseline='alphabetic'; ctx.textAlign='left';
     const y=base-(z.r.base||0)*s;
     if(z.r.it){ ctx.save(); ctx.translate(cx,y); ctx.transform(1,0,-0.2,1,0,0); ctx.fillText(z.t,0,0); ctx.restore(); } else ctx.fillText(z.t,cx,y);
     cx+=z.w; }
@@ -1672,7 +1674,7 @@ function stampHlts(ctx,A,item,k,gw,cell){ if(!STAMP_END||!itemHlt(item).length) 
   const bg=E.proc?rasterColor(A['r_'+(CUR_T&&procBoxFile(CUR_T))])||'#0b3aa8':'#111111';
   drawHlts(ctx,item,E.x,E.y,1,{W:Math.max(150,Math.min(260,(gw||E.w||200)*0.85)),color:'#ffffff',bg,...(cell?{maxY:cell.y+cell.h-10,maxX:cell.x+cell.w-10,minY:cell.y+10}:{})},HITS,k); }
 function procDraw(ctx,A,L,x,y){
-  const ink=(BGL!=null&&BGL<165)?'#ffffff':'#111111';
+  const ink=INKO||((BGL!=null&&BGL<165)?'#ffffff':'#111111');
   for(const o of L.ops){
     if(o.box){ const im=o.img&&A['r_'+o.img]; ctx.fillStyle=o.col==='blue'?rasterColor(im||A['r_'+(CUR_T&&procBoxFile(CUR_T))]):o.col; ctx.beginPath(); ctx.roundRect(x+o.x,y+o.y,o.w,o.h,Math.min(o.h*0.16,18)); ctx.fill(); continue; }
     if(o.img!==undefined||o.fallback){ const im=o.img&&A['r_'+o.img]; if(im) ctx.drawImage(im,x+o.x,y+o.y,o.w,o.h);
@@ -1693,6 +1695,7 @@ function stampGeom(ctx,st,item,s){
   return {w:x1-x0,lx:-x0,up,h:h+up};
 }
 function drawStamp(ctx,A,st,item,x,y,s){
+  INKO=(item&&item.ink)||ARTINK||null;   // cor do preço/descrição escolhida (produto ou arte)
   if(isProc(CUR_T)&&st.parts&&st.parts.int){ const L=procLayout(ctx,st,item,s); procDraw(ctx,A,L,x,y); STAMP_END={x,y:y+L.h+6,w:L.w,proc:true}; return; }
   const Q=stampPrep(ctx,st,item,s);
   const ax=x-Q.bbox[0]*s, ay=y-Q.bbox[1]*s;
@@ -2042,7 +2045,7 @@ function renderFixed(ctx,A,T,data){
 }
 let HITS=[];   // clickable areas of the last render (drag on the preview)
 function renderReplay(ctx,A,T,data){
-  CUR_T=T; HITS=[]; procLayout.auto=T.namePos||'side'; NAMECASE=data.nameCase||(T.client==='Proner'?'title':'auto'); NAMESIZE=data.nameSize||T.nameSize||1; PRICESIZE=data.priceSize||1;
+  CUR_T=T; HITS=[]; procLayout.auto=T.namePos||'side'; NAMECASE=data.nameCase||(T.client==='Proner'?'title':'auto'); NAMESIZE=data.nameSize||T.nameSize||1; PRICESIZE=data.priceSize||1; ARTINK=data.ink||null;
   if(T.fixed) return renderFixed(ctx,A,T,data);
   const bd=bdById(T,data.bd)||chooseBd(T,data.kind,!!data.band,data.title,data.validity);
   if(ctx.canvas.width!==bd.W||ctx.canvas.height!==bd.H){ ctx.canvas.width=bd.W; ctx.canvas.height=bd.H; }
@@ -2469,7 +2472,7 @@ function sigOf(g){
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),cities:$('#in-cities').value,from:$('#in-from').value,to:$('#in-to').value,
-  grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
+  grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
 async function openJobsDialog(){
@@ -2510,7 +2513,7 @@ async function openSavedJob(name,job){
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
-  S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,
+  S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,
     savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
     validity:jg.validity||{from:job.from||'',to:job.to||''},
     // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
@@ -2535,7 +2538,7 @@ function updateSaveState(){
   const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
-  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
+  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; if(jg.ink) g.ink=jg.ink; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
   $('#in-cities').value=job.cities||$('#in-cities').value; $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
 }
 function changed(it){ const o=it.orig||{}; return it.name!==o.name||it.price!==o.price||it.club!==o.club||it.unit!==o.unit||it.raw!==it.raw0; }
@@ -2924,12 +2927,12 @@ async function gridData(g){
   const slots={};
   for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh,hlt:it.hlt,hadj:it.hadj},imgs,variant:it.variant||undefined}; }
   const T=activate(g);
-  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize}; }
+  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize,ink:g.ink}; }
   const bev=!!(g.bebidas&&TPL.bebidas);
   let from=$('#in-from').value||'__/__', to=$('#in-to').value||'__/__', band=$('#in-cities').value;
   if(g.gvalidity&&(g.bebidas||g.valOwn)){ from=g.gvalidity.from||from; to=g.gvalidity.to||to; band=bandText(bev?{...TPL,...TPL.bebidas}:TPL,citiesOf(band),from,to); }
   if(g.bandOwn) band=g.band||'';
-  return {band, validity:{from,to}, bebidas:bev, slots, nameSize:g.nameSize};
+  return {band, validity:{from,to}, bebidas:bev, slots, nameSize:g.nameSize, ink:g.ink};
 }
 async function renderGrid(gi){
   const g=S.grids[gi]; const c=$('#cv-'+gi); if(!c) return;
@@ -2950,9 +2953,15 @@ async function renderAll(){ for(let i=0;i<S.grids.length;i++){ await renderGrid(
 const VAR_LABEL={clubBig:'clube grande',clubSmall1:'preço à esquerda, foto à direita',clubRight:'preço à direita, foto à esquerda',clubSmall2:'preço em cima, foto embaixo',clubBelow:'foto em cima, preço embaixo',simpleBig:'preço grande',simpleSmall1:'preço à esquerda, foto à direita',simpleRight:'preço à direita, foto à esquerda',simpleSmall2:'preço em cima, foto embaixo',simpleBelow:'foto em cima, preço embaixo'};
 
 // ---------- grid UI ----------
+// cor do texto do preço/descrição: automática (pelo fundo), branco, preto ou qualquer cor
+function inkSel(cur,onv,lab){ const opts=[['','cor: auto'],['#ffffff','cor: branco'],['#111111','cor: preto'],['custom','cor: outra…']];
+  const sel=el('select',{class:'un',title:lab,onchange:e=>{ let v=e.target.value; if(v==='custom'){ const c=document.createElement('input'); c.type='color'; c.value=cur&&cur[0]==='#'?cur:'#ffffff'; c.oninput=()=>onv(c.value); c.click(); return; } onv(v||null); }},
+    ...opts.map(([v,t])=>el('option',{value:v,selected:(cur||'')===v||(v==='custom'&&cur&&!['#ffffff','#111111'].includes(cur))},t)));
+  return sel; }
 function gridTplUI(gi){
   const g=S.grids[gi]; const T=tplOfGrid(g); if(!T) return null;
-  if(T.kind!=='replay') return el('span',{class:'gtpl'},el('span',{class:'gsz',title:'Tamanho das descrições de todos os produtos desta arte'},' letra ',fine(0.6,1.8,0.01,g.nameSize||1,v=>{ g.nameSize=v; try{ localStorage.setItem('ns:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho das descrições',true)));
+  const ik=inkSel(g.ink,v=>{ g.ink=v; renderSoon(gi); },'Cor dos preços e descrições de toda a arte');
+  if(T.kind!=='replay') return el('span',{class:'gtpl'},ik,el('span',{class:'gsz',title:'Tamanho das descrições de todos os produtos desta arte'},' letra ',fine(0.6,1.8,0.01,g.nameSize||1,v=>{ g.nameSize=v; try{ localStorage.setItem('ns:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho das descrições',true)));
   const ts=el('select',{class:'gsel',title:'Campanha desta arte',onchange:async e=>{ await setGridTemplate(g,e.target.value); buildGridUI(); await renderAll(); }},
     ...tplList().filter(x=>x.kind==='replay'&&x.client===T.client).map(x=>el('option',{value:x.id,selected:x.id===T.id},x.name)));
   activate(g);
@@ -2966,7 +2975,7 @@ function gridTplUI(gi){
     ...[['title','Descrição: Iniciais Maiúsculas'],['upper','Descrição: MAIÚSCULAS'],['auto','Descrição: como no PSD']].map(([v,t])=>el('option',{value:v,selected:(g.nameCase||def)===v},t)));
   const sz=el('span',{class:'gsz',title:'Tamanho das descrições de todos os produtos desta arte'},' letra ',fine(0.6,2.2,0.01,g.nameSize||T.nameSize||1,v=>{ g.nameSize=v; try{ localStorage.setItem('ns:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho das descrições',true));
   const pz=T.kind==='replay'?el('span',{class:'gsz',title:'Tamanho dos preços de todos os produtos desta arte'},' preço ',fine(0.6,1.6,0.01,g.priceSize||1,v=>{ g.priceSize=v; try{ localStorage.setItem('ps:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho dos preços',true)):null;
-  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz);
+  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz,ik);
 }
 // tarja e validade de cada arte (o texto da Proner traz várias campanhas, cada uma com datas e cidades próprias)
 function gridMetaUI(gi){
@@ -3080,7 +3089,7 @@ function buildRows(gi){
       slotSel,
       el('div',{class:'imgcol'},thumbs,isOpen?flag:null),
       body||el('div',{class:'info'},el('button',{class:'close',title:'Fechar',onclick:toggle},el('span',{class:'chev up'})),nameIn,
-        el('div',{class:'prices'},el('label',{},'Preço ',pIn),el('label',{},'Clube ',cIn),uSel,cuSel,varSel,
+        el('div',{class:'prices'},el('label',{},'Preço ',pIn),el('label',{},'Clube ',cIn),uSel,cuSel,inkSel(it.ink,v=>{ if(v) it.ink=v; else delete it.ink; renderSoon(gi); },'Cor do preço e da descrição deste produto'),varSel,
           el('button',{class:'hlb'+(it.hl?' on':''),title:'Produto em destaque (amarelo na planilha) vai para a caixa laranja',onclick:()=>toggleHl(gi,it)},it.hl?'★ destaque':'☆ destaque')),
         imgAdjUI(gi,it),
         priceAdjUI(gi,it),
