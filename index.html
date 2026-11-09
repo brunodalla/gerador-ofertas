@@ -863,14 +863,14 @@ function drawClubStack(ctx,A,it,ox,oy,s,bb,dark,nz=1,cell=null){
   // nome comprido (letra mínima legível): o balão cresce para cima em vez de o texto invadir o preço
   const name=it.name; let fs0=S(19.46*Math.min(1.35,nz)), ln=wrapLines(ctx,name,F_MSB,fs0,-30,S(255));
   while(ln.length>3&&fs0>Math.max(S(14),15)){ fs0*=0.95; ln=wrapLines(ctx,name,F_MSB,fs0,-30,S(255)); }
-  const ext=Math.max(0,ln.length*fs0*1.2-S(68));
+  const ext=Math.max(0,ln.length*fs0*1.2-S(62));
   ctx.drawImage(lbx, 0,0,lbx.width,lbx.height*0.35, ox, oy-ext, S(289), S(142)*0.35+1);
   if(ext>0) ctx.drawImage(lbx, 0,lbx.height*0.34,lbx.width,2, ox, oy-ext+S(142)*0.35, S(289), ext+1);
   ctx.drawImage(lbx, 0,lbx.height*0.35,lbx.width,lbx.height*0.65, ox, oy+S(142)*0.35, S(289), S(142)*0.65);
   ctx.drawImage(A.pct, ox+S(108), oy-ext+S(-76), S(85), S(88));   // % icon in front of the white box
   setFont(ctx,F_MSB,S(19.46),-30);
   const n=Math.min(ln.length,3);
-  const top = (ext>0?10:n<=1? 33 : n===2? 23.7 : 17)-ext/s;
+  const top = (ext>0?16:n<=1? 33 : n===2? 23.7 : 17)-ext/s;   // abaixo do ícone de %
   drawParagraph(ctx,name,{x:ox+S(18.75),top:oy+S(top),width:S(255),font:F_MSB,size:S(19.46*Math.min(1.35,nz)),track:-30,align:'center',maxLines:3,minSize:S(14)});
   // "de" price
   const p=fmtPrice(it.price||0);
