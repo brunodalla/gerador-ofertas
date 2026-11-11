@@ -1926,7 +1926,7 @@ function drawGridCell(ctx,A,T,cell,item,imgs,ss,k){
 // ---- capa ----
 function sizeClass(item){
   const n=unacc(item.name);
-  if(/FARDO|PACK|\bCX\b|CAIXA|\b(5|10|12|15|20)\s?(KG|L|LT)\b|FRALDA|PAPEL HIG|MELANCIA|COSTELA|PE[CÇ]A|\bKIT\b|BALDE|PANELA|LAVA ROUPA|AMACIANTE|SABAO EM PO|\b(1[2-9]|[2-9]\d)\s?(ROLOS|UN)\b|PERNIL|PICANHA|ALCATRA|BOVIN|SUIN|FRANGO INTEIRO|PALETA|\b2\s?L\b|\b2,5\s?L\b|\b3\s?L\b|GALAO|ARROZ\s.*5|COLCHAO|TV\b|BICICLETA|MELAO|ABACAXI|REPOLHO|MAMAO/.test(n)) return 3;
+  if(/FARDO|PACK|\bCX\b|CAIXA|\b(5|10|12|15|20)\s?(KG|L|LT)\b|FRALDA|PAPEL HIG|MELANCIA|COSTELA|PE[CÇ]A|\bKIT\b|BALDE|PANELA|LAVA ROUPA|AMACIANTE|SABAO EM PO|\b(1[2-9]|[2-9]\d)\s?(ROLOS|UN)\b|PERNIL|PICANHA|ALCATRA|BOVIN|SUIN|FRANGO INTEIRO|PALETA|\b2\s?L\b|\b2,5\s?L\b|\b3\s?L\b|GALAO|ARROZ\s.*5|COLCHAO|TV\b|BICICLETA|MELAO|ABACAXI|REPOLHO|MAMAO|ABOBORA|MORANGA|COUVE.FLOR/.test(n)) return 3;
   if(/LATA|\b\d{2,3}\s?(G|GR|ML)\b|SACHE|IOGURTE|GELATINA|TEMPERO|CREME DENTAL|SABONETE|PILHA|CHOCOLATE|BOMBOM|BARRA|BISCOITO|MIOJO|LAMEN|CAFE\s.*\b(250|500)|FERMENTO|ESPONJA|\bUND\b.*\b(100|200)\s?G|LIMAO|ALHO|KIWI/.test(n)) return 1;
   return 2;
 }
@@ -1955,9 +1955,24 @@ function renderCapa(ctx,A,T,Z,entries,bd){
   for(let i=0;i<nb;i++){ const q=prep(entries[i].item,nb===1?ZW*0.7:ZW/nb*0.94,ZH*0.42); back.push(q); band=Math.max(band,q.gm.h); }
   const backTop=Z[1]+band+8, backBot=nf?Z[1]+ZH*(ZH/ZW>1.2?0.70:0.74):Z[3];
   const maxB=Math.max(...cls.slice(0,nb));
-  back.forEach((b,i)=>{ const ov=nb>1?lw*(nb>2?0.26:0.14):0; const lx0=BX0+lw*i;
+  const bBox=i=>{ const ov=nb>1?lw*(nb>2?0.26:0.14):0; const lx0=BX0+lw*i;
     let box={x:lx0-(i?ov:0),y:backTop,w:lw+(i?ov:0)+(i<nb-1?ov:0),h:backBot-backTop};
-    const k=CLS_F[cls[i]]/CLS_F[maxB]; box={x:box.x+box.w*(1-k)/2,y:box.y+box.h*(1-k),w:box.w*k,h:box.h*k};
+    const k=CLS_F[cls[i]]/CLS_F[maxB]; return {x:box.x+box.w*(1-k)/2,y:box.y+box.h*(1-k),w:box.w*k,h:box.h*k}; };
+  const fTop=Z[1]+ZH*(nb>2?(ZH/ZW>1.2?0.50:0.54):0.46), lw2=nf?CW/nf:0, maxF=nf?Math.max(...cls.slice(nb)):0;
+  const fBox=j=>{ const ov=lw2*0.16; let box={x:X0+lw2*j-(j?ov:0),y:fTop,w:lw2+(j?ov:0)+(j<nf-1?ov:0),h:Z[3]-fTop};
+    const k=CLS_F[cls[nb+j]]/CLS_F[maxF]; return {x:box.x+box.w*(1-k)/2,y:box.y+box.h*(1-k),w:box.w*k,h:box.h*k}; };
+  // ESCALA UNIFORME: os produtos da capa ficam com tamanhos parecidos, respeitando só a proporção da vida real
+  // (melão > manga > limão). Sem isso, uma foto larga e baixa (cenoura, manga deitada) ficava minúscula ao lado de
+  // uma foto alta. Cada caixa cresce ou encolhe a partir da base até a área visível ficar perto da média.
+  const UNI=(()=>{ const bx=[...back.map((_,i)=>bBox(i)),...front.map((_,j)=>fBox(j))]; if(bx.length<2) return bx.map(()=>1);
+    const REAL={1:0.62,2:1,3:1.3};
+    const ar=bx.map((b,i)=>{ const f=fitRect(entries[i].imgs,b,3.2); return f?Math.sqrt(f.w*f.h)/REAL[cls[i]]:null; });
+    const ok=ar.filter(Boolean); if(ok.length<2) return bx.map(()=>1);
+    const tgt=Math.max(...ok)*0.9;   // todos sobem para perto do maior (o conjunto fica grande, não encolhido)
+    return ar.map((v,i)=>v?Math.max(0.9,Math.min(cls[i]===1?1:1.6,tgt/v)):1); })();   // itens pequenos de verdade (lata, sachê, limão) não crescem
+  const uBox=(b,u,minY,xa=Z[0],xb=Z[2],maxW=1e9)=>{ const cx=b.x+b.w/2, bot=b.y+b.h; let w=Math.min(b.w*u,maxW,xb-xa), h=b.h*u; if(bot-h<minY) h=bot-minY;
+    let x=cx-w/2; x=Math.max(xa,Math.min(xb-w,x)); return {x,y:bot-h,w,h}; };
+  back.forEach((b,i)=>{ let box=uBox(bBox(i),UNI[i],backTop);
     b.box=adjBox(box,b.it.adj); b.imgs=entries[i].imgs;
     const fr=fitRect(b.imgs,b.box,3.2)||{x:b.box.x,y:b.box.y,w:b.box.w,h:b.box.h}; b.rect=[fr.x,fr.y,fr.x+fr.w,fr.y+fr.h];
     const cx=(b.rect[0]+b.rect[2])/2; let x=cx-b.gm.w/2; x=Math.max(Z[0],Math.min(Z[2]-b.gm.w,x));
@@ -1966,15 +1981,16 @@ function renderCapa(ctx,A,T,Z,entries,bd){
   for(let i=1;i<back.length;i++){ const a=back[i-1], b=back[i]; if(b.x<a.x+a.gm.w+10) b.x=a.x+a.gm.w+10; }
   for(let i=back.length-1;i>=0;i--){ const b=back[i]; const lim=i<back.length-1?back[i+1].x-10:Z[2]; if(b.x+b.gm.w>lim) b.x=lim-b.gm.w; }
   for(let i=1;i<back.length;i++){ const a=back[i-1], b=back[i]; const ov=inter([a.x,a.y,a.x+a.gm.w,a.y+a.gm.h],[b.x,b.y,b.x+b.gm.w,b.y+b.gm.h]); if(ov>0){ if(b.y>=a.y) b.y=Math.max(Z[1],a.y-0) ; b.x=a.x+a.gm.w+8; } }
-  if(nf){ const top=Z[1]+ZH*(nb>2?(ZH/ZW>1.2?0.50:0.54):0.46); const lw2=CW/nf; const maxF=Math.max(...cls.slice(nb));
-    front.forEach((f,j)=>{ const ov=lw2*0.16; let box={x:X0+lw2*j-(j?ov:0),y:top,w:lw2+(j?ov:0)+(j<nf-1?ov:0),h:Z[3]-top};
-      const k=CLS_F[cls[nb+j]]/CLS_F[maxF]; box={x:box.x+box.w*(1-k)/2,y:box.y+box.h*(1-k),w:box.w*k,h:box.h*k};
+  if(nf){
+    front.forEach((f,j)=>{ let box=uBox(fBox(j),UNI[nb+j],backTop+(backBot-backTop)*0.22,Z[0],Z[2],ZW*(nf>1?0.54:0.9));
       f.box=adjBox(box,f.it.adj); f.imgs=entries[nb+j].imgs;
       const fr=fitRect(f.imgs,f.box,3.2)||{x:f.box.x,y:f.box.y+f.box.h*0.3,w:f.box.w,h:f.box.h*0.7}; f.rect=[fr.x,fr.y,fr.x+fr.w,fr.y+fr.h];
       const right=nf>1&&j===nf-1;
       f.x= right? Math.min(Z[2]-f.gm.w,Math.max(f.rect[2]-f.gm.w*0.1,Z[2]-m+6)) : Math.max(Z[0],Math.min(f.rect[0]-f.gm.w+f.gm.w*0.1,Z[0]+m-6-f.gm.w));
       if(nf===1) f.x=Math.max(Z[0],f.rect[0]-f.gm.w*0.95);
-      f.y=Math.min(Z[3]-f.gm.h,Math.max(f.rect[1]+(f.rect[3]-f.rect[1])*0.08,backBot-f.gm.h*0.5)); });
+      f.y=Math.min(Z[3]-f.gm.h,Math.max(f.rect[1]+(f.rect[3]-f.rect[1])*0.08,backBot-f.gm.h*0.5));
+      // a foto maior pode entrar na margem do preço: aí o preço sobe para cima da foto em vez de ficar por cima dela
+      if(UNI[nb+j]>1.05&&inter([f.x,f.y,f.x+f.gm.w,f.y+f.gm.h],f.rect)>f.gm.w*f.gm.h*0.04) f.y=Math.max(backTop,f.rect[1]-f.gm.h-4); });
     if(nf>2) front.slice(1,-1).forEach(f=>{ f.x=(f.rect[0]+f.rect[2])/2-f.gm.w/2; f.y=Math.min(Z[3]-f.gm.h,f.rect[3]-f.gm.h); });
   }
   const all=[...back,...front];
