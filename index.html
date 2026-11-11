@@ -1773,7 +1773,7 @@ function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null
   // layout first (no drawing), then work only inside the products' own area: much faster than full-size layers
   const L=drawImageFit(STUB,imgs,bx,{maxUp:4,valign,iadj}); if(!L) return null;
   const rects=L.rects||[{x:L.x0,y:L.y0,w:L.x1-L.x0,h:L.y1-L.y0}];
-  const M=60, ox=Math.floor(Math.min(...rects.map(R=>R.x))-M), oy=Math.floor(Math.min(...rects.map(R=>R.y))-M);
+  const M=Math.round(70+0.3*Math.max(...rects.map(R=>R.h))), ox=Math.floor(Math.min(...rects.map(R=>R.x))-M), oy=Math.floor(Math.min(...rects.map(R=>R.y))-M);
   const W=Math.ceil(Math.max(...rects.map(R=>R.x+R.w))+M)-ox, H=Math.ceil(Math.max(...rects.map(R=>R.y+R.h))+M)-oy;
   const c=document.createElement('canvas'); c.width=Math.max(1,W); c.height=Math.max(1,H); const x=c.getContext('2d');
   x.translate(-ox,-oy); drawImageFit(x,imgs,bx,{maxUp:4,valign,iadj});
@@ -1782,7 +1782,7 @@ function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null
   const sil=document.createElement('canvas'); sil.width=sw; sil.height=shh; const sx=sil.getContext('2d');
   sx.drawImage(c,0,0,sw,shh); sx.globalCompositeOperation='source-in'; sx.fillStyle='#000'; sx.fillRect(0,0,sw,shh);
   const out=document.createElement('canvas'); out.width=sw; out.height=shh; const o=out.getContext('2d');
-  o.filter='blur('+(16/K)+'px)'; o.globalAlpha=0.35; o.drawImage(sil,6/K,16/K); o.filter='none'; o.globalAlpha=1;
+  o.filter='blur('+(20/K)+'px)'; o.globalAlpha=0.3; o.drawImage(sil,5/K,13/K); o.filter='none'; o.globalAlpha=1;
   // contact shadow that follows the product's footprint (not a round blob under the lowest point): for every column
   // take the bottom edge of the product, flatten it onto the ground and paint a soft band whose thickness fades as
   // the edge rises. Carrots lying sideways get a long shadow under all of them, a melon a wide oval under it.
@@ -1796,14 +1796,17 @@ function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null
       // smooth the edge a little so the band has no steps
       const sm=yb.map((v,i)=>{ let t=0,c=0; for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++) if(yb[j]>=0){ t+=yb[j]; c++; } return c&&v>=0?t/c:-1; });
       const cols=sm.map((v,i)=>v<0?null:{x:x0+i,rise:ymax-v}).filter(Boolean); if(cols.length<3) return;
-      const wd=cols[cols.length-1].x-cols[0].x, th=Math.max(2.2,Math.min(ph*0.075,wd*0.07))*sS, cxm=(cols[0].x+cols[cols.length-1].x)/2;
-      const wOf=c=>{ const e=Math.min(c.x-cols[0].x,cols[cols.length-1].x-c.x)/Math.max(1,wd*0.12); return Math.max(0,1-c.rise/(ph*0.62))*Math.min(1,0.25+e); };
-      const gy=c=>ymax-c.rise*0.3+sY/K, gx=c=>cxm+(c.x-cxm)*sS;
+      const wd=cols[cols.length-1].x-cols[0].x, th=Math.max(3,Math.min(ph*0.1,wd*0.085))*sS, cxm=(cols[0].x+cols[cols.length-1].x)/2;
+      // contact shadow: hugs the bottom edge where the product touches the ground. Steep parts of the edge (the sides
+      // of a round fruit) are not touching, so the band fades there; sloped parts (carrots lying at an angle) keep it.
+      cols.forEach((c,i)=>{ const a=cols[Math.max(0,i-4)], b=cols[Math.min(cols.length-1,i+4)]; c.sl=Math.abs(b.rise-a.rise)/Math.max(1,b.x-a.x); });
+      const wOf=c=>{ const e=Math.min(c.x-cols[0].x,cols[cols.length-1].x-c.x)/Math.max(1,wd*0.14); return (1/(1+Math.pow(c.sl/1.1,2)))*Math.max(0.3,1-c.rise/(ph*1.15))*Math.min(1,e); };
+      const gy=c=>ymax-c.rise*0.92+th*0.45+sY/K, gx=c=>cxm+(c.x-cxm)*sS;
       const band=(k,al,bl)=>{ o.save(); o.filter='blur('+bl.toFixed(1)+'px)'; o.globalAlpha=Math.min(1,al*sA); o.fillStyle='#000'; o.beginPath();
         cols.forEach((c,i)=>{ const y=gy(c)-th*k*wOf(c)*0.75; i?o.lineTo(gx(c),y):o.moveTo(gx(c),y); });
         for(let i=cols.length-1;i>=0;i--){ const c=cols[i]; o.lineTo(gx(c),gy(c)+th*k*wOf(c)); }
         o.closePath(); o.fill(); o.restore(); };
-      band(1.5,0.42,Math.max(2,th*0.9)); band(0.8,0.5,Math.max(1.2,th*0.4)); }); }
+      band(1.6,0.5,Math.max(3,th*1.0)); band(0.8,0.55,Math.max(1.8,th*0.5)); }); }
   ctx.save(); ctx.imageSmoothingQuality='high'; ctx.drawImage(out,ox,oy,sw*K,shh*K); ctx.restore();
   ctx.drawImage(c,ox,oy);
   return L;
@@ -2589,10 +2592,19 @@ function restoreItem(gi,it){
 function removeItem(gi,it){ it.removed=true; it.prevSlot=it.slot; it.slot=''; buildRows(gi); renderSoon(gi); balanceParts(gi); }
 // artes que são partes da mesma lista dividida pelo programa ("... (1/2)", "(2/2)"): quando uma fica com 2+ itens
 // a menos que outra (ex.: 5 e 7 depois de tirar um produto), passa produtos da maior para a menor (6 e 6)
+// mandar um produto para outra arte (ex.: da arte 4 para a 3)
+function moveItem(gi,it,to){ const a=S.grids[gi], b=S.grids[to]; if(!a||!b||a===b) return;
+  a.items.splice(a.items.indexOf(it),1); it.i=Math.max(-1,...b.items.map(x=>x.i))+1; it.slot=''; it.removed=false; b.items.push(it);
+  for(const k of [gi,to]){ reassignGrid(S.grids[k]); buildRows(k); renderSoon(k); } jobChanged(); toast(`${it.name} foi para a arte ${to+1}.`); }
+// artes do mesmo modelo e mesma campanha (mesmo sem ter sido o programa que dividiu): oferece equilibrar
+function campKey(g){ return g.kind==='grid'&&window.TPLS[g.tpl]&&window.TPLS[g.tpl].kind==='replay'?g.tpl+'|'+(g.title||'').replace(/\s*\(\d+\/\d+\)/,''):null; }
 function partKey(g){ const m=/^(.*) \(\d+\/\d+\)( · bebidas)?$/.exec(g.label||''); return m&&g.kind!=='capa'?g.tpl+'|'+m[1]:null; }
-function balanceParts(gi){
-  const g0=S.grids[gi], k=g0&&partKey(g0); if(!k) return;
-  const grp=S.grids.map((g,i)=>({g,i})).filter(o=>partKey(o.g)===k); if(grp.length<2) return;
+function balanceParts(gi,force){
+  const g0=S.grids[gi]; if(!g0) return; let k=partKey(g0), key=partKey;
+  if(!k){ k=campKey(g0); key=campKey; if(!k) return;
+    if(!force){ const gr=S.grids.filter(g=>campKey(g)===k), c=gr.map(g=>g.items.filter(i=>!i.removed).length);
+      if(gr.length>1&&Math.max(...c)-Math.min(...c)>=2) toastAction(`As artes desse modelo ficaram com ${c.join(' e ')} produtos.`,'Equilibrar',()=>balanceParts(gi,true)); return; } }
+  const grp=S.grids.map((g,i)=>({g,i})).filter(o=>key(o.g)===k); if(grp.length<2) return;
   const cnt=g=>g.items.filter(i=>!i.removed).length; const moved=[];
   for(let guard=0;guard<20;guard++){ const hi=grp.reduce((a,b)=>cnt(b.g)>cnt(a.g)?b:a), lo=grp.reduce((a,b)=>cnt(b.g)<cnt(a.g)?b:a);
     if(cnt(hi.g)-cnt(lo.g)<2) break;
@@ -3161,6 +3173,7 @@ function buildRows(gi){
           it.imgIds.length>1?el('button',{class:'lnk',onclick:()=>{ it.imgIds=it.imgIds.slice(0,1); remember(it,{imgs:it.imgIds}); buildRows(gi); renderSoon(gi);} },'tirar 2ª'):null,
           el('label',{class:'lnk'},'foto/arquivo…',el('input',{type:'file',accept:'image/*,.psd',hidden:true,onchange:e=>e.target.files[0]&&openNewImage(gi,it,e.target.files[0])})),
           el('span',{class:'sp'}),
+          S.grids.length>1?el('select',{class:'un',title:'Mandar este produto para outra arte',onchange:e=>{ const v=e.target.value; if(v!=='') moveItem(gi,it,+v); }},el('option',{value:''},'mover para…'),...S.grids.map((o,k)=>k===gi?null:el('option',{value:k},'arte '+(k+1))).filter(Boolean)):null,
           el('button',{class:'lnk rm',onclick:()=>removeItem(gi,it)},'✕ tirar da arte'))));
     groupAdj(row);
     if(changed(it)||it.added) row.classList.add('edited');
