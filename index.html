@@ -1783,15 +1783,27 @@ function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null
   sx.drawImage(c,0,0,sw,shh); sx.globalCompositeOperation='source-in'; sx.fillStyle='#000'; sx.fillRect(0,0,sw,shh);
   const out=document.createElement('canvas'); out.width=sw; out.height=shh; const o=out.getContext('2d');
   o.filter='blur('+(16/K)+'px)'; o.globalAlpha=0.35; o.drawImage(sil,6/K,16/K); o.filter='none'; o.globalAlpha=1;
-  // contact shadow: a soft dark ellipse tucked under the base of every image; width from the lowest opaque rows,
-  // height capped by the product height (flat wide things like egg trays get a thin one)
+  // contact shadow that follows the product's footprint (not a round blob under the lowest point): for every column
+  // take the bottom edge of the product, flatten it onto the ground and paint a soft band whose thickness fades as
+  // the edge rises. Carrots lying sideways get a long shadow under all of them, a melon a wide oval under it.
   const SH=shOpt||{}; const sS=SH.s??1, sY=SH.y||0, sA=SH.a??1;
-  if(sA>0) rects.forEach((R,i)=>{ const B=baseOf(imgs[i]||imgs[0]);
-    const bot=R.y+R.h*B.bot, top=R.y+R.h*B.top, l=R.x+R.w*B.l, rr=R.x+R.w*B.r; const ph=Math.max(20,bot-top);
-    const rw=Math.max(24,(rr-l)*0.51)*sS, rh=Math.min(Math.max(8,rw*0.11),ph*0.05)*sS;
-    const cx=(l+rr)/2-ox, cy=bot-rh*0.35+sY-oy;
-    o.save(); o.filter='blur('+((6+rh*0.5)/K).toFixed(1)+'px)'; o.globalAlpha=Math.min(1,0.6*sA); o.fillStyle='#000'; o.beginPath(); o.ellipse(cx/K,cy/K,rw/K,rh/K,0,0,Math.PI*2); o.fill(); o.restore();
-    o.save(); o.filter='blur('+(4/K).toFixed(1)+'px)'; o.globalAlpha=Math.min(1,0.5*sA); o.fillStyle='#000'; o.beginPath(); o.ellipse(cx/K,(cy-rh*0.15)/K,rw*0.8/K,Math.max(4,rh*0.38)/K,0,0,Math.PI*2); o.fill(); o.restore(); });
+  if(sA>0){ const D=sx.getImageData(0,0,sw,shh).data;
+    rects.forEach(R=>{ const x0=Math.max(0,Math.floor((R.x-ox)/K)), x1=Math.min(sw-1,Math.ceil((R.x+R.w-ox)/K)), y0=Math.max(0,Math.floor((R.y-oy)/K)), y1=Math.min(shh-1,Math.ceil((R.y+R.h-oy)/K));
+      const yb=[]; let ymax=-1, ymin=1e9;
+      for(let X=x0;X<=x1;X++){ let b=-1; for(let Y=y1;Y>=y0;Y--) if(D[(Y*sw+X)*4+3]>60){ b=Y; break; } yb.push(b); if(b>ymax) ymax=b;
+        if(b>=0) for(let Y=y0;Y<=b;Y++) if(D[(Y*sw+X)*4+3]>60){ if(Y<ymin) ymin=Y; break; } }
+      if(ymax<0) return; const ph=Math.max(6,ymax-ymin), n=yb.length;
+      // smooth the edge a little so the band has no steps
+      const sm=yb.map((v,i)=>{ let t=0,c=0; for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++) if(yb[j]>=0){ t+=yb[j]; c++; } return c&&v>=0?t/c:-1; });
+      const cols=sm.map((v,i)=>v<0?null:{x:x0+i,rise:ymax-v}).filter(Boolean); if(cols.length<3) return;
+      const wd=cols[cols.length-1].x-cols[0].x, th=Math.max(2.2,Math.min(ph*0.075,wd*0.07))*sS, cxm=(cols[0].x+cols[cols.length-1].x)/2;
+      const wOf=c=>{ const e=Math.min(c.x-cols[0].x,cols[cols.length-1].x-c.x)/Math.max(1,wd*0.12); return Math.max(0,1-c.rise/(ph*0.62))*Math.min(1,0.25+e); };
+      const gy=c=>ymax-c.rise*0.3+sY/K, gx=c=>cxm+(c.x-cxm)*sS;
+      const band=(k,al,bl)=>{ o.save(); o.filter='blur('+bl.toFixed(1)+'px)'; o.globalAlpha=Math.min(1,al*sA); o.fillStyle='#000'; o.beginPath();
+        cols.forEach((c,i)=>{ const y=gy(c)-th*k*wOf(c)*0.75; i?o.lineTo(gx(c),y):o.moveTo(gx(c),y); });
+        for(let i=cols.length-1;i>=0;i--){ const c=cols[i]; o.lineTo(gx(c),gy(c)+th*k*wOf(c)); }
+        o.closePath(); o.fill(); o.restore(); };
+      band(1.5,0.42,Math.max(2,th*0.9)); band(0.8,0.5,Math.max(1.2,th*0.4)); }); }
   ctx.save(); ctx.imageSmoothingQuality='high'; ctx.drawImage(out,ox,oy,sw*K,shh*K); ctx.restore();
   ctx.drawImage(c,ox,oy);
   return L;
@@ -1844,11 +1856,13 @@ function gridCells0(n,G,Z){
     const v=Math.abs(Math.log(ar/ar0))+(C!==G.cols?0.35:0)+(n%C?0.12:0); if(!best||v<best.v) best={C,v}; }
   const C=best?best.C:1, cells=[];
   if(C===2&&n%2===1&&n>1){
-    // odd count: all rows aligned, the last product takes the whole last row (5 = 2 + 2 + 1 wide)
-    const R=Math.ceil(n/2), cw=(W-g)/2, ch=(H-g*(R-1))/R;
-    const X=c=>Math.round(Z[0]+c*(cw+g)), Y=r=>Math.round(Z[1]+r*(ch+g)), Yb=r=>Math.round(Z[1]+r*(ch+g)+ch);
-    for(let r=0;r<R;r++){ if(r<R-1){ for(let c=0;c<2;c++) cells.push({x:X(c),y:Y(r),w:Math.round(Z[0]+c*(cw+g)+cw)-X(c),h:Yb(r)-Y(r),par:(r+c)%2}); }
-      else cells.push({x:X(0),y:Y(r),w:Math.round(Z[2])-X(0),h:Yb(r)-Y(r),par:r%2,wide:true}); }
+    // odd count: all rows aligned; the last product takes a tall cell (two rows) on the right, so it sits centred
+    // with less empty space than a wide row (7 = 2+2 | 2 small on the left + 1 tall on the right)
+    const R=(n+1)/2, cw=(W-g)/2, ch=(H-g*(R-1))/R;
+    const X=c=>Math.round(Z[0]+c*(cw+g)), XR=c=>Math.round(Z[0]+c*(cw+g)+cw), Y=r=>Math.round(Z[1]+r*(ch+g)), Yb=r=>Math.round(Z[1]+r*(ch+g)+ch);
+    for(let r=0;r<R-2;r++) for(let c=0;c<2;c++) cells.push({x:X(c),y:Y(r),w:XR(c)-X(c),h:Yb(r)-Y(r),par:(r+c)%2});
+    for(let r=R-2;r<R;r++) cells.push({x:X(0),y:Y(r),w:XR(0)-X(0),h:Yb(r)-Y(r),par:r%2});
+    cells.push({x:X(1),y:Y(R-2),w:XR(1)-X(1),h:Yb(R-1)-Y(R-2),par:(R-1)%2,tall:true});
     return cells;
   }
   if(C<=2){
@@ -2572,7 +2586,25 @@ function restoreItem(gi,it){
   if(rawChanged) autoPickImages(it);
   buildRows(gi); renderSoon(gi); toast('Produto voltou ao que está na planilha.');
 }
-function removeItem(gi,it){ it.removed=true; it.prevSlot=it.slot; it.slot=''; buildRows(gi); renderSoon(gi); }
+function removeItem(gi,it){ it.removed=true; it.prevSlot=it.slot; it.slot=''; buildRows(gi); renderSoon(gi); balanceParts(gi); }
+// artes que são partes da mesma lista dividida pelo programa ("... (1/2)", "(2/2)"): quando uma fica com 2+ itens
+// a menos que outra (ex.: 5 e 7 depois de tirar um produto), passa produtos da maior para a menor (6 e 6)
+function partKey(g){ const m=/^(.*) \(\d+\/\d+\)( · bebidas)?$/.exec(g.label||''); return m&&g.kind!=='capa'?g.tpl+'|'+m[1]:null; }
+function balanceParts(gi){
+  const g0=S.grids[gi], k=g0&&partKey(g0); if(!k) return;
+  const grp=S.grids.map((g,i)=>({g,i})).filter(o=>partKey(o.g)===k); if(grp.length<2) return;
+  const cnt=g=>g.items.filter(i=>!i.removed).length; const moved=[];
+  for(let guard=0;guard<20;guard++){ const hi=grp.reduce((a,b)=>cnt(b.g)>cnt(a.g)?b:a), lo=grp.reduce((a,b)=>cnt(b.g)<cnt(a.g)?b:a);
+    if(cnt(hi.g)-cnt(lo.g)<2) break;
+    const act=hi.g.items.filter(i=>!i.removed), it=hi.i<lo.i?act[act.length-1]:act[0];
+    hi.g.items.splice(hi.g.items.indexOf(it),1); const oi=it.i; it.i=Math.max(-1,...lo.g.items.map(x=>x.i))+1; it.slot='';
+    if(hi.i<lo.i) lo.g.items.unshift(it); else lo.g.items.push(it); moved.push({it,from:hi,to:lo,oi}); }
+  if(!moved.length) return;
+  const redo=()=>{ for(const o of grp){ reassignGrid(o.g); buildRows(o.i); renderSoon(o.i); } jobChanged(); };
+  redo();
+  toastAction(`Artes equilibradas: ${grp.map(o=>cnt(o.g)).join(' e ')} produtos (${moved.map(m=>m.it.name).join(', ')} mudou de arte).`,'Desfazer',()=>{
+    for(const m of moved.reverse()){ m.to.g.items.splice(m.to.g.items.indexOf(m.it),1); m.it.i=m.oi; m.it.slot=''; m.from.g.items.push(m.it); } redo(); });
+}
 function freeSlot(g,pref){ const used=new Set(g.items.filter(i=>!i.removed&&i.slot).map(i=>i.slot)); if(pref&&!used.has(pref)) return pref; return SLOT_ORDER.find(s=>!used.has(s))||''; }
 function unremoveItem(gi,it){ const g=S.grids[gi]; it.removed=false; it.slot=freeSlot(g,it.prevSlot); buildRows(gi); renderSoon(gi); }
 function addItem(gi){
