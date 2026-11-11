@@ -1782,38 +1782,32 @@ function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null
   const sil=document.createElement('canvas'); sil.width=sw; sil.height=shh; const sx=sil.getContext('2d');
   sx.drawImage(c,0,0,sw,shh); sx.globalCompositeOperation='source-in'; sx.fillStyle='#000'; sx.fillRect(0,0,sw,shh);
   const out=document.createElement('canvas'); out.width=sw; out.height=shh; const o=out.getContext('2d');
-  o.filter='blur('+(20/K)+'px)'; o.globalAlpha=0.3; o.drawImage(sil,5/K,13/K); o.filter='none'; o.globalAlpha=1;
-  // contact shadow that follows the product's footprint (not a round blob under the lowest point): for every column
-  // take the bottom edge of the product, flatten it onto the ground and paint a soft band whose thickness fades as
-  // the edge rises. Carrots lying sideways get a long shadow under all of them, a melon a wide oval under it.
+  // SOMBRA DE CONTATO (como o Bruno faz no Photoshop): uma elipse escura e esfumada embaixo de cada produto, encostada
+  // na base. Uma foto com dois "pés" (ex.: pêssego inteiro + metade) ganha uma elipse embaixo de cada um.
+  // Ajustes por produto: s (tamanho), w (escala X), h (escala Y), x/y (posição), a (opacidade).
   const SH=shOpt||{}; const sS=SH.s??1, sY=SH.y||0, sA=SH.a??1, sW=(SH.w??1)*sS, sH=(SH.h??1)*sS, sX=SH.x||0;
   if(sA>0){ const D=sx.getImageData(0,0,sw,shh).data;
+    const blob=(cx,cy,rw,rh,al)=>{ if(rw<1||rh<0.5) return; o.save(); o.translate(cx,cy); o.scale(1,rh/rw); const g=o.createRadialGradient(0,0,0,0,0,rw);
+      [[0,0.9],[0.18,0.74],[0.36,0.46],[0.55,0.22],[0.75,0.07],[1,0]].forEach(([t,v])=>g.addColorStop(t,'rgba(0,0,0,'+Math.min(1,v*al).toFixed(3)+')')); o.fillStyle=g; o.beginPath(); o.arc(0,0,rw,0,7); o.fill(); o.restore(); };
     rects.forEach(R=>{ const x0=Math.max(0,Math.floor((R.x-ox)/K)), x1=Math.min(sw-1,Math.ceil((R.x+R.w-ox)/K)), y0=Math.max(0,Math.floor((R.y-oy)/K)), y1=Math.min(shh-1,Math.ceil((R.y+R.h-oy)/K));
       const yb=[]; let ymax=-1, ymin=1e9;
-      for(let X=x0;X<=x1;X++){ let b=-1; for(let Y=y1;Y>=y0;Y--) if(D[(Y*sw+X)*4+3]>60){ b=Y; break; } yb.push(b); if(b>ymax) ymax=b;
-        if(b>=0) for(let Y=y0;Y<=b;Y++) if(D[(Y*sw+X)*4+3]>60){ if(Y<ymin) ymin=Y; break; } }
+      for(let X=x0;X<=x1;X++){ let bt=-1; for(let Y=y1;Y>=y0;Y--) if(D[(Y*sw+X)*4+3]>60){ bt=Y; break; } yb.push(bt); if(bt>ymax) ymax=bt;
+        if(bt>=0) for(let Y=y0;Y<=bt;Y++) if(D[(Y*sw+X)*4+3]>60){ if(Y<ymin) ymin=Y; break; } }
       if(ymax<0) return; const ph=Math.max(6,ymax-ymin), n=yb.length;
-      // smooth the edge a little so the band has no steps
-      const sm=yb.map((v,i)=>{ let t=0,c=0; for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++) if(yb[j]>=0){ t+=yb[j]; c++; } return c&&v>=0?t/c:-1; });
-      const cols=sm.map((v,i)=>v<0?null:{x:x0+i,rise:ymax-v}).filter(Boolean); if(cols.length<3) return;
-      // "ground line": the convex envelope under the bottom edge. It bridges the gaps between the tips of a bunch
-      // (carrots), so the shadow also runs under the middle, where the edge itself is jagged and high.
-      { const hull=[]; for(const c of cols){ while(hull.length>=2){ const a=hull[hull.length-2], m=hull[hull.length-1]; const yi=a.rise+(c.rise-a.rise)*(m.x-a.x)/(c.x-a.x); if(m.rise>yi-1e-6) hull.pop(); else break; } hull.push(c); }
-        let h=0; for(const c of cols){ while(h<hull.length-2&&hull[h+1].x<c.x) h++; const a=hull[h], b=hull[Math.min(hull.length-1,h+1)]; c.edge=c.rise; c.rise=b.x===a.x?a.rise:Math.min(c.rise,a.rise+(b.rise-a.rise)*(c.x-a.x)/(b.x-a.x)); } }
-      const wd=cols[cols.length-1].x-cols[0].x, th=Math.max(3,Math.min(ph*0.1,wd*0.085))*sH, cxm=(cols[0].x+cols[cols.length-1].x)/2;
-      // contact shadow: hugs the bottom edge where the product touches the ground. Steep parts of the edge (the sides
-      // of a round fruit) are not touching, so the band fades there; sloped parts (carrots lying at an angle) keep it.
-      cols.forEach((c,i)=>{ const a=cols[Math.max(0,i-4)], b=cols[Math.min(cols.length-1,i+4)]; c.sl=Math.abs(b.rise-a.rise)/Math.max(1,b.x-a.x); });
-      const wOf=c=>{ const e=Math.min(c.x-cols[0].x,cols[cols.length-1].x-c.x)/Math.max(1,wd*0.14); return (1/(1+Math.pow(c.sl/1.1,2)))*Math.max(0.3,1-c.rise/(ph*1.15))*Math.min(1,e); };
-      const gy=c=>ymax-c.rise*0.92+th*0.45+sY/K, gx=c=>cxm+(c.x-cxm)*sW+sX/K;
-      const band=(k,al,bl)=>{ o.save(); o.filter='blur('+bl.toFixed(1)+'px)'; o.globalAlpha=Math.min(1,al*sA); o.fillStyle='#000'; o.beginPath();
-        cols.forEach((c,i)=>{ const y=gy(c)-th*k*wOf(c)*0.75; i?o.lineTo(gx(c),y):o.moveTo(gx(c),y); });
-        for(let i=cols.length-1;i>=0;i--){ const c=cols[i]; o.lineTo(gx(c),gy(c)+th*k*wOf(c)); }
-        o.closePath(); o.fill(); o.restore(); };
-      // darker "under" area between the real edge and the ground line (the hollow under a bunch)
-      if(cols.some(c=>c.edge-c.rise>ph*0.04)){ o.save(); o.filter='blur('+Math.max(2,th*0.7).toFixed(1)+'px)'; o.globalAlpha=Math.min(1,0.45*sA); o.fillStyle='#000'; o.beginPath();
-        cols.forEach((c,i)=>{ const y=ymax-Math.min(c.edge,c.rise+ph*0.2)+sY/K; i?o.lineTo(gx(c),y):o.moveTo(gx(c),y); }); for(let i=cols.length-1;i>=0;i--){ const c=cols[i]; o.lineTo(gx(c),gy(c)); } o.closePath(); o.fill(); o.restore(); }
-      band(1.6,0.5,Math.max(3,th*1.0)); band(0.8,0.55,Math.max(1.8,th*0.5)); }); }
+      const cols=[]; yb.forEach((v,i)=>{ if(v<0) return; let t=0,c=0; for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++) if(yb[j]>=0){ t+=yb[j]; c++; } cols.push({x:x0+i,rise:ymax-t/c}); });
+      if(cols.length<4) return;
+      // split the base into "feet": a foot ends where the bottom edge rises clearly between two lower parts
+      const feet=[]; const split=(a,b,d)=>{ const len=b-a, m=Math.max(2,Math.round(len*0.14)); let k=-1, top=-1;
+        for(let i=a+m;i<=b-m;i++) if(cols[i].rise>top){ top=cols[i].rise; k=i; }
+        const mn=(p,q)=>{ let v=1e9; for(let i=p;i<=q;i++) v=Math.min(v,cols[i].rise); return v; };
+        if(d<2&&k>0&&len>cols.length*0.3&&top-Math.max(mn(a,k),mn(k,b))>ph*0.07){ split(a,k,d+1); split(k,b,d+1); } else feet.push([a,b]); };
+      split(0,cols.length-1,0);
+      for(const [a,b] of feet){ let lo=a; for(let i=a;i<=b;i++) if(cols[i].rise<cols[lo].rise) lo=i;
+        // contact width: the part of this foot that is near its lowest point (a round fruit touches in the middle)
+        let l=lo, r=lo; const lim=cols[lo].rise+ph*0.2; while(l>a&&cols[l-1].rise<=lim) l--; while(r<b&&cols[r+1].rise<=lim) r++;
+        const fw=cols[b].x-cols[a].x, cw=cols[r].x-cols[l].x, wd=Math.max(cw*1.25,fw*0.7), cx=(cols[l].x+cols[r].x)/2;
+        const rw=wd*0.62*sW, rh=Math.max(2.5,wd*0.115)*sH, cy=ymax-cols[lo].rise-rh*0.05+sY/K;
+        blob(cx+sX/K,cy,rw,rh,0.9*sA); blob(cx+sX/K,cy-rh*0.1,rw*0.6,rh*0.5,0.55*sA); } }); }
   ctx.save(); ctx.imageSmoothingQuality='high'; ctx.drawImage(out,ox,oy,sw*K,shh*K); ctx.restore();
   ctx.drawImage(c,ox,oy);
   return L;
@@ -3259,7 +3253,7 @@ function shadowAdjUI(gi,it){
   const fmt=()=>{ const b=it.sh||{}; return (b.a??1)<=0?'sem sombra':''; };
   const lab=el('span',{class:'adjv'},fmt());
   const rng=(k,min,max,step,val,t)=>fine(min,max,step,val,v=>set(k,v),t,/^(ps|ls|ns|s|a)$/.test(k));
-  return el('div',{class:'adj'},el('b',{},'Sombra:'),' tamanho ',rng('s',0.2,3,0.02,a.s??1,'Tamanho geral da sombra'),' largura ',fine(0.2,3,0.02,a.w??1,v=>set('w',v),'Esticar/encolher a sombra para os lados',true),' altura ',fine(0.2,4,0.02,a.h??1,v=>set('h',v),'Achatar/engrossar a sombra',true),' X ',rng('x',-300,300,1,a.x||0,'Sombra para a esquerda/direita'),' Y ',rng('y',-200,200,1,a.y||0,'Subir/descer a sombra'),' força ',rng('a',0,2,0.05,a.a??1,'Força da sombra (0 = sem sombra)'),lab,
+  return el('div',{class:'adj'},el('b',{},'Sombra:'),' tamanho ',rng('s',0.2,3,0.02,a.s??1,'Tamanho geral da sombra'),' escala X ',fine(0.2,3,0.02,a.w??1,v=>set('w',v),'Esticar/encolher a sombra para os lados',true),' escala Y ',fine(0.2,4,0.02,a.h??1,v=>set('h',v),'Achatar/engrossar a sombra',true),' X ',rng('x',-300,300,1,a.x||0,'Sombra para a esquerda/direita'),' Y ',rng('y',-200,200,1,a.y||0,'Subir/descer a sombra'),' opacidade ',rng('a',0,2,0.05,a.a??1,'Opacidade da sombra (0 = sem sombra)'),lab,
     el('button',{class:'lnk',onclick:()=>{ it.sh=null; remember(it,{sh:null}); buildRows(gi); renderSoon(gi); }},'↺'));
 }
 // destaques: caixinhas no estilo do limite. Sugestões vêm das observações da planilha/texto e do que está entre parênteses no nome
