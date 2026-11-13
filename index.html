@@ -202,6 +202,31 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
 #newimg.bkmode #ni-ps,#newimg.bkmode .nm2{display:none}
 @media (max-width:760px){ #bankview{padding:0 12px 30px} .tabs{margin-left:0;width:100%} .tabs button{flex:1} #bk-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
  .bki{grid-template-columns:1fr} .bku-row{grid-template-columns:80px 1fr auto} .bku-th canvas{width:80px;height:80px} }
+
+.ck-btn{border-color:rgba(255,145,40,.5)} .ck-btn.ck-bad{border-color:var(--bad);color:var(--bad)}
+.ck-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.ck-sum{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ck-pill{padding:3px 10px;border-radius:99px;font-weight:700;font-size:13px}
+.ck-pill.err{background:var(--badbg);color:var(--bad)} .ck-pill.warn{background:var(--warnbg);color:var(--warn)} .ck-pill.ok{background:var(--okbg);color:var(--ok)}
+.ck-filter{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.ck-filter button{background:none;border:0;color:var(--mut);font:inherit;font-size:13px;padding:5px 10px;border-radius:8px;cursor:pointer} .ck-filter button.on{background:var(--card2);color:var(--ink)}
+#ck-list{max-height:64vh;overflow:auto;display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.ck-gh{margin:10px 0 2px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.ck-item{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:start;background:var(--card2);border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:10px;padding:10px}
+.ck-item.err{border-left-color:var(--bad)} .ck-item.warn{border-left-color:var(--warn)}
+.ck-th{width:72px;height:72px;background:#fff;border-radius:8px}
+.ck-body{min-width:0;display:flex;flex-direction:column;gap:5px}
+.ck-nm{font-size:14px} .ck-msgs{display:flex;flex-direction:column;gap:4px}
+.ck-m{display:flex;gap:8px;align-items:baseline;font-size:13px;flex-wrap:wrap} .ck-m>span:nth-child(2){flex:1 1 320px;min-width:0} .ck-m .lnk{font-size:12px}
+.ck-dot{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none;transform:translateY(-1px)} .ck-m.err .ck-dot{background:var(--bad)} .ck-m.warn .ck-dot{background:var(--warn)}
+.ck-line{font-size:12px;color:var(--mut);background:var(--bg2);border-radius:6px;padding:4px 8px;word-break:break-word} .ck-line span{font-weight:600}
+.ck-acts{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.ck-add>span{flex:none!important}
+@media (max-width:1650px){ #actions>.st{display:none} }
+.btn.sm{padding:5px 10px;font-size:12px}
+.row.ck-err{box-shadow:inset 4px 0 0 var(--bad)} .row.ck-warn{box-shadow:inset 4px 0 0 var(--warn)}
+.row.ck-flash{outline:2px solid var(--or);outline-offset:2px}
+@media (max-width:760px){ .ck-item{grid-template-columns:56px 1fr} .ck-th{width:56px;height:56px} .ck-acts{grid-column:1/-1;flex-direction:row;align-items:center} }
 </style></head>
 <body>
 <div id="boot">Carregando…</div>
@@ -237,7 +262,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
     </div>
   </div>
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
-  <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
+  <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
 <section id="bankview">
   <div id="bk-conn" class="step"><h3>Banco de imagens</h3><div class="st">Conecte o banco para ver, buscar, trocar e enviar imagens de produtos.</div>
@@ -270,6 +295,12 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
   <div class="st">Dê o nome do produto para cada foto e escolha se ela é uma imagem nova ou se substitui uma antiga (a antiga fica guardada em _antigas). O fundo branco sai sozinho; use "Ajustar recorte" para a IA ou brilho/contraste.</div>
   <div id="bku-list"></div>
   <div class="nia"><button class="btn" id="bku-add">+ adicionar mais fotos</button><span style="flex:1"></span><button class="btn" id="bku-cancel">Cancelar</button><button class="btn pri" id="bku-save">Salvar no banco</button></div></div></dialog>
+<dialog id="conf"><div style="padding:16px 18px;width:min(980px,95vw)">
+  <div class="ck-head"><h3 style="margin:0">Conferente</h3><div id="ck-sum" class="ck-sum"></div><span style="flex:1"></span>
+    <div id="ck-filter" class="ck-filter"><button data-f="prob" class="on">Erros e avisos</button><button data-f="all">Tudo</button></div></div>
+  <div class="st" style="margin:4px 0 8px">Compara cada produto com a planilha/texto do cliente (descrição, tamanho, preços, limite, destaque, observações) e confere se a imagem bate com a descrição. Clique em "está certo" para não avisar mais aquele item.</div>
+  <div id="ck-list"></div>
+  <div class="nia"><button class="btn" id="ck-again">Conferir de novo</button><span style="flex:1"></span><button class="btn pri" id="ck-close">Fechar</button></div></div></dialog>
 <dialog id="picker"><div class="pkh"><input id="pk-q" placeholder="Buscar produto na biblioteca…"><button class="btn" id="pk-close">Fechar</button></div><div id="pk-title"></div><div id="pk-res"></div></dialog>
 <dialog id="newimg"><div class="nih"><b>Nova imagem</b><span id="ni-prod"></span></div>
   <div class="nib">
@@ -592,7 +623,7 @@ function parseValidity(title){
 }
 function splitUnit(name){
   let n=(name||'').toString().replace(/\s+/g,' ').trim(); let unit='UND';
-  const m=/\s+(KG|UND|UN|UNID)\.?$/i.exec(n);
+  const m=/(?<!\d[.,]?\d*)\s+(KG|UND|UN|UNID)\.?$/i.exec(n);   // "ARROZ 5 KG": 5 KG é o tamanho, não a unidade do preço
   if(m){ unit=/KG/i.test(m[1])?'KG':'UND'; n=n.slice(0,m.index).trim(); }
   return {name:n,unit};
 }
@@ -748,10 +779,10 @@ function parseItemLine(line){
   // "Cerveja Amstel C/12 35,76" style: keep
   let unit='UND', per=null;
   if(/\bA?\s*CADA\s*(CEM|100)\s*G/i.test(t)){ per='100G'; }
-  const um=/\s(KG|UN|UND|UNID|LT|L|PCT|CX|BDJ)\.?$/i.exec(name)||/\b(KG|UN|UND)\b/i.exec(t.slice(nums[0].i+nums[0].len,nums[0].i+nums[0].len+6));
+  const um=/(?<!\d)\s(KG|UN|UND|UNID|LT|L|PCT|CX|BDJ)\.?$/i.exec(name)||/\b(KG|UN|UND)\b/i.exec(t.slice(nums[0].i+nums[0].len,nums[0].i+nums[0].len+6));
   if(um){ unit=/KG/i.test(um[1])?'KG':'UND'; if(um.index!=null&&um.input===name) name=name.slice(0,um.index).trim(); }
-  if(/\bKG\b/i.test(name)&&!um){ unit='KG'; }
-  name=name.replace(/\s+(KG|UN|UND)\.?$/i,'').trim();
+  if(/(?<!\d\s?)\bKG\b/i.test(name)&&!um){ unit='KG'; }
+  name=name.replace(/(?<!\d)\s+(KG|UN|UND)\.?$/i,'').trim();
   if(!name) return null;
   const it={raw:name.toUpperCase(),name:name.toUpperCase(),unit,price,club:(club&&price&&club<price)?club:club,hl,note:notes.join(' · '),notes};
   if(per){ it.punit=per; }
@@ -2724,6 +2755,201 @@ function bvInit(){
   const bu=$('#bk-up'); bu.addEventListener('dragover',e=>{ e.preventDefault(); e.stopPropagation(); }); bu.addEventListener('drop',e=>{ e.preventDefault(); e.stopPropagation(); bvUpload(e.dataTransfer.files); });
 }
 
+// ---------- Conferente: confere as artes com o que o cliente mandou (planilha ou texto) ----------
+// S.src = {name, lines:[texto de cada linha/linha da planilha], changes:[textos colados de alterações], cities, validity}
+const CK={res:[],byRow:new Map(),filter:'prob'};
+function srcFromRows(rows){
+  return rows.map(r=>{ if(!r) return ''; const hl=typeof isYellow==='function'&&r.fill&&isYellow(r.fill[0]);
+    const cells=r.map((c,j)=>c==null?'':typeof c==='number'?(j>0&&c<100000?c.toFixed(2).replace('.',','):String(c)):String(c).replace(/\s+/g,' ').trim());
+    const t=cells.filter(Boolean).join(' | '); return t?(hl?t+' ★':t):''; });
+}
+function setSource(lines,extra){ S.src={name:S.sheetName||'',lines:(lines||[]).map(l=>String(l||'')),changes:[],...(extra||{})}; }
+
+// preços escritos na linha (2 casas), sem pegar tamanho ("1,25L"), nem datas
+const CK_PRICE=/(?:R\$\s*)?(?<![\d.,/])(\d{1,4}(?:\.\d{3})?[.,]\d{2})(?![\d.,]?\d)(?!\s*(?:ML|L|LT|LTS|LITROS?|G|GR|GRS|GRAMAS?|M|MTS?|CM|MM|CC|%)\b)/gi;
+const CK_HDR=/V[AÁ]LID|\bOFERTAS?\s+(V[AÁ]LID|DE|DO|DA)\b|TABLOIDE|ENCARTE|FOLHETO|\b(SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|DOMINGO)(-FEIRA)?\b.*\b\d{1,2}[./](0?[1-9]|1[0-2])(?![\d])/i;
+function ckPrices(t){ const out=[]; CK_PRICE.lastIndex=0; let m; while((m=CK_PRICE.exec(t))){ const v=parsePrice(m[1].replace(/\.(\d{3})[.,]/,'$1,')); if(v!=null&&v>0) out.push({v,i:m.index,len:m[0].length}); } return out; }
+// "5.99/$4.99" e "5,99 / 4,99" -> dois preços
+function ckPre(t){ return String(t||'').replace(/\.{3,}|…+|_{3,}/g,' ').replace(/(\d{1,4})[.,](\d{2})\s*\/\s*(R?\$)?\s*(\d{1,4})[.,](\d{2})(?!\d)/g,'$1,$2 CLUBE $4,$5').replace(/\s+/g,' ').trim(); }
+// informações extras que precisam aparecer na arte
+const CK_EXTRA=[
+  {k:'limite',rx:/\bLIMITE\b[^|;]*/i,has:(it)=>/LIMITE/i.test(ckItemText(it))},
+  {k:'100g',rx:/\b(A\s+)?CADA\s*(CEM|100)\s*G\w*/i,has:(it)=>/100G/i.test((it.punit||'')+' '+(it.cunit||'')+' '+it.unit)||/100\s*G/i.test(ckItemText(it))},
+  {k:'leve',rx:/\bLEVE\s+\d+[^|;]*/i,has:(it)=>/LEVE|PAGUE/i.test(ckItemText(it))},
+  {k:'embalagem',rx:/\b(NESTA EMBALAGEM|UNIDADE SAI|SAI POR|CADA UMA)\b[^|;]*/i,has:(it)=>/EMBALAGEM|SAI POR|CADA UMA/i.test(ckItemText(it))},
+  {k:'retornavel',rx:/\b(RETORN[AÁ]VEL|CASCO)\b[^|;]*/i,has:(it)=>/RETORN|CASCO/i.test(ckItemText(it))},
+  {k:'exceto',rx:/\b(EXCETO|SEM\s+[A-ZÇÃÁÉÍÓÚ]{3,})\b[^|;]*/i,has:(it,m)=>norm(ckItemText(it)).includes(norm(m).split(' ').slice(0,2).join(' '))},
+  {k:'sabores',rx:/\b(SABORES|FRAGR[AÂ]NCIAS|VARIAD[OA]S|DIVERSOS|CORES)\b/i,has:(it,m)=>norm(ckItemText(it)).includes(norm(m).slice(0,5))},
+  {k:'brinde',rx:/\b(BRINDE|GR[AÁ]TIS|KIT)\b[^|;]*/i,has:(it,m)=>norm(ckItemText(it)).includes(norm(m).split(' ')[0])},
+];
+function ckItemText(it){ return [it.name,it.note,...(it.notes||[]),it.raw].filter(Boolean).join(' ').toUpperCase(); }
+function ckQty(s){ return new Set(norm(s).split(/\s+/).filter(t=>/^\d+(?:\.\d+)?(ml|g|m)$/.test(t))); }
+function ckQtyTxt(set){ return [...set].map(t=>{ const m=/^(\d+(?:\.\d+)?)(ml|g|m)$/.exec(t); if(!m) return t; const v=+m[1];
+  if(m[2]==='ml') return v>=1000?(v/1000+'L').replace('.',','):v+'ML'; if(m[2]==='g') return v>=1000?(v/1000+'KG').replace('.',','):v+'G'; return v+'M'; }).join(' / '); }
+function ckWords(s){ return new Set(tokens(s).filter(t=>t.length>=3&&!/^\d/.test(t)&&!/^(clube|destaque|limite|cliente|oferta|preco|cada|leve|pague|sabores|und|kg|unid|pct)$/.test(t))); }
+function ckSim(a,b){ const A=new Set(tokens(a)),B=new Set(tokens(b)); if(!A.size||!B.size) return 0; let h=0; for(const t of A) h+=prefixHit(t,B); let h2=0; for(const t of B) h2+=prefixHit(t,A); return (h/A.size+h2/B.size)/2; }
+function ckSame(a,b){ const W=[...ckWords(a)], B=new Set(tokens(b)); if(!W.length) return false; let h=0; for(const w of W) h+=prefixHit(w,B); return h/W.length>=0.6; }
+const ckP=(a,b)=>a!=null&&b!=null&&Math.abs(a-b)<0.006;
+
+function ckEntries(lines){
+  const E=[]; let last=null;
+  // "NOME" e na linha de baixo só "14,99": uma linha só (como o leitor de texto faz)
+  lines=lines.map(l=>ckPre(l)); const L=[];
+  for(let i=0;i<lines.length;i++){ const a=lines[i]; let j=i+1; while(j<lines.length&&!lines[j]&&j-i<2) j++;
+    if(a&&j<lines.length&&/^(R\$\s*)?\d{1,4}[.,]\d{2}\s*(\w{0,3})$/i.test(lines[j])&&!ckPrices(a).length){ L.push(a+' '+lines[j]); L.push(''); i=j; } else L.push(a); }
+  lines=L;
+  lines.forEach((raw,i)=>{ const t=ckPre(raw); if(!t){ last=null; return; }
+    const pr=ckPrices(t);
+    if(!pr.length||(CK_HDR.test(t)&&!/\$/.test(t))){ // linha de observação logo abaixo de um produto
+      if(last&&!CK_HDR.test(t)&&t.length<=120&&(looksNote(t)||/^[(*•\-–]/.test(t))) last.extra.push(t);
+      else last=null; return; }
+    let desc;
+    if(t.includes(' | ')){ const cells=t.split(' | '); const pure=c=>ckPrices(c).length&&c.replace(/R?\$|[\d.,\s/]|\b(KG|UN|UND|CADA|A|100\s*G\w*|CLUBE)\b/gi,'').length<3; let k=cells.findIndex(pure); if(k<0) k=cells.findIndex(c=>ckPrices(c).length); desc=cells.slice(0,k<0?1:k).filter(c=>!/^(CAPA|GRID|DESTAQUE|\d+)$/i.test(c.trim())).sort((a,b)=>b.length-a.length)[0]||cells[0];
+      if(k===0) desc=cells[0].slice(0,ckPrices(cells[0])[0].i); }
+    else desc=t.slice(0,pr[0].i); desc=desc.replace(/R\$\s*$/,'').replace(/[★*]/g,'').replace(/[—–\-|:]+\s*$/,'').replace(/\.?\s*\bDESTAQUE\b.*$/i,'').trim();
+    if(!desc||!/[A-Za-zÀ-ú]{3}/.test(desc)){ return; }
+    const rest=t.includes(' | ')?t.split(' | ').filter(c=>c!==desc).join(' | '):t.slice(pr[0].i);
+    last={i,text:String(raw).replace(/\s+/g,' ').trim(),desc,prices:[...new Set(pr.map(p=>p.v))],hl:/★|\bDESTAQUE\b/i.test(t.replace(/\bDAR\s+DESTAQUE\s+(NO|NA|AO|À|A)\b[^|]*/gi,'')),club:/CLUBE|CLUB\b/i.test(t),extra:[rest]}; E.push(last);
+  });
+  return E;
+}
+function ckAdd(r){ CK.res.push(r); }
+
+function ckRun(){
+  CK.res=[]; CK.byRow=new Map();
+  const src=S.src&&S.src.lines&&S.src.lines.length?S.src:null;
+  const E=src?ckEntries(src.lines):[];
+  const CH=src&&src.changes?ckEntries(src.changes.flatMap(t=>String(t).split('\n'))):[];
+  const all=[]; S.grids.forEach((g,gi)=>g.items.forEach(it=>all.push({g,gi,it})));
+  // casa cada produto da arte com a linha do cliente (um para um, pelos nomes mais parecidos)
+  const pairs=[]; for(const x of all){ const q=[x.it.raw0,x.it.raw,x.it.orig&&x.it.orig.name,x.it.name].filter(Boolean);
+    E.forEach((e,ei)=>{ let s=0; for(const n of q) s=Math.max(s,ckSim(n,e.desc)); if(s>=0.45) pairs.push({x,ei,s}); }); }
+  pairs.sort((a,b)=>b.s-a.s); const used=new Set(), match=new Map();
+  for(const p of pairs){ if(used.has(p.ei)||match.has(p.x)) continue; used.add(p.ei); match.set(p.x,E[p.ei]); }
+  const ignore=(it,key)=>it&&it.ckIgnore&&it.ckIgnore.includes(key);
+  for(const x of all){ const {gi,it}=x; if(it.removed) continue;
+    const add=(lvl,key,msg,more)=>{ if(ignore(it,key)) return; ckAdd({lvl,key,gi,it,msg,...(more||{})}); };
+    const e=match.get(x);
+    // ---- produto na arte ----
+    if(!it.slot) add('err','fora','Este produto ficou fora da arte (sem posição).');
+    if(it.price==null&&it.club==null) add('err','semprec','Produto sem preço.');
+    if(it.price!=null&&it.club!=null&&it.club>=it.price) add('warn','clubealto',`O preço do clube (R$ ${fmtP(it.club)}) não é menor que o normal (R$ ${fmtP(it.price)}).`);
+    // ---- com o que o cliente mandou ----
+    if(src){
+      if(!e){ if(it.added) add('info','novo','Produto incluído à mão / pelas alterações do cliente: não está na planilha/texto original.');
+        else add('warn','semlinha','Não encontrei este produto no que o cliente mandou. Confira o nome.'); }
+      else {
+        let ref=[...e.prices]; let viaChg=false;
+        if(it.cliChg||it.added){ for(const c of CH) if(Math.max(ckSim(it.name,c.desc),ckSim(it.raw||'',c.desc))>=0.45){ ref=[...ref,...c.prices]; viaChg=true; } }
+        const mine=[it.price,it.club].filter(v=>v!=null);
+        const noteTxt=ckItemText(it); const inNote=v=>noteTxt.includes(fmtP(v));
+        const wrong=mine.filter(v=>!ref.some(r=>ckP(r,v)));
+        const miss=e.prices.filter(r=>!mine.some(v=>ckP(r,v))&&!inNote(r));
+        if(wrong.length&&!(it.cliChg&&!viaChg)) add('err','preco',`Preço diferente do cliente: na arte ${mine.map(v=>'R$ '+fmtP(v)).join(' / ')}; o cliente mandou ${e.prices.map(v=>'R$ '+fmtP(v)).join(' / ')}.`,{line:e.text});
+        else if(wrong.length) add('info','precochg',`Preço alterado depois (alterações do cliente): na arte ${mine.map(v=>'R$ '+fmtP(v)).join(' / ')}; na planilha/texto original ${e.prices.map(v=>'R$ '+fmtP(v)).join(' / ')}.`,{line:e.text});
+        else if(miss.length&&!it.cliChg) add('err','precofalta',`O cliente mandou ${miss.map(v=>'R$ '+fmtP(v)).join(' / ')} e esse preço não está na arte${e.club&&it.club==null?' (faltou o preço do clube?)':''}.`,{line:e.text});
+        if(it.price!=null&&it.club!=null&&e.prices.length>=2&&!wrong.length&&ckP(it.price,e.prices[1])&&ckP(it.club,e.prices[0])&&e.prices[0]<e.prices[1]) add('warn','invertido','Os preços normal e clube parecem invertidos em relação ao que o cliente mandou.',{line:e.text});
+        // descrição: tamanho e palavras
+        const qs=ckQty(e.desc), qa=ckQty(it.name);
+        if(qs.size&&qa.size&&![...qs].some(q=>qa.has(q))) add('err','tam',`Tamanho diferente: o cliente escreveu ${ckQtyTxt(qs)}, a arte diz ${ckQtyTxt(qa)}.`,{line:e.text});
+        else if(qs.size&&!qa.size) add('warn','tamfalta',`O cliente escreveu ${ckQtyTxt(qs)} e a descrição da arte não tem o tamanho.`,{line:e.text});
+        const ws=ckWords(e.desc), wa=new Set(tokens(it.name+' '+(it.notes||[]).join(' ')));
+        const lost=[...ws].filter(w=>!prefixHit(w,wa));
+        if(lost.length&&lost.length/Math.max(1,ws.size)>=0.25) add('warn','desc',`Palavras do cliente que não estão na descrição da arte: ${lost.map(w=>w.toUpperCase()).join(', ')}.`,{line:e.text});
+        // informações extras
+        const ext=e.extra.join(' | ');
+        for(const X of CK_EXTRA){ const m=X.rx.exec(ext); if(!m) continue; const txt=m[0].replace(/\s*\|.*$/,'').replace(/[\s)(.,;:\-–]+$/,'').replace(/^[\s(]+/,'').trim(); if(!X.has(it,txt)) add('warn','x-'+X.k,`Informação do cliente que não está na arte: "${txt}".`,{line:e.text}); }
+        if(e.hl&&!it.hl) add('warn','destaque','O cliente marcou este produto como DESTAQUE e na arte ele não está em destaque.',{line:e.text});
+      }
+    }
+    // ---- imagem x descrição ----
+    if(!it.imgIds||!it.imgIds.length){ add('err','semimg','Produto sem imagem.'); continue; }
+    const qa=ckQty(it.name); const itxt=it.name+' '+(it.raw0||'')+' '+(it.notes||[]).join(' ');
+    it.imgIds.forEach((id,pos)=>{ const im=S.lib.byId.get(id); if(!im) return; const qi=ckQty(im.name);
+      const better=()=>{ if(!qa.size) return null; const r=search(S.lib.index,it.name,15).map(x=>x.item).filter(c=>c.id!==id&&[...ckQty(c.name)].some(q=>qa.has(q))&&ckSame(it.name,c.name)); return r.length?rankRecent(r.map(item=>({item,score:1})))[0].item:null; };
+      if(qa.size&&qi.size&&![...qa].some(q=>qi.has(q))){ const b=better(); add('err','img-tam'+pos,`A imagem é de ${ckQtyTxt(qi)} ("${im.name}") e o produto é ${ckQtyTxt(qa)}.`+(b?` No banco tem "${b.name}".`:' Não achei no banco uma imagem com esse tamanho.'),{img:id,fix:b&&{pos,id:b.id,name:b.name}}); return; }
+      if(qa.size&&!qi.size){ const b=better(); if(b) add('warn','img-semtam'+pos,`A imagem "${im.name}" não diz o tamanho; no banco tem "${b.name}", que é ${ckQtyTxt(qa)}.`,{img:id,fix:{pos,id:b.id,name:b.name}}); }
+      const wi=[...ckWords(im.name)], wt=new Set(tokens(itxt)); const off=wi.filter(w=>!prefixHit(w,wt));
+      if(wi.length&&off.length/wi.length>=0.4) add('warn','img-nome'+pos,`A imagem "${im.name}" pode ser de outro produto (não bate: ${off.map(w=>w.toUpperCase()).join(', ')}).`,{img:id});
+    });
+    if(it.conf==='low') add('info','img-incerta','O app não teve certeza da imagem quando montou a arte.',{img:it.imgIds[0]});
+  }
+  // linhas do cliente que não viraram produto
+  if(src){ const removedHit=e=>all.some(x=>x.it.removed&&Math.max(ckSim(x.it.raw0||x.it.raw||'',e.desc),ckSim(x.it.name,e.desc))>=0.45);
+    E.forEach((e,ei)=>{ if(used.has(ei)) return; if(S.ckIgnore&&S.ckIgnore.includes('linha:'+e.text)) return;
+      if(removedHit(e)) ckAdd({lvl:'info',key:'linha:'+e.text,gi:null,it:null,msg:'Produto do cliente que você tirou das artes.',line:e.text});
+      else ckAdd({lvl:'err',key:'linha:'+e.text,gi:null,it:null,msg:'Produto que o cliente mandou e não está em nenhuma arte.',line:e.text}); });
+    // validade e tarja
+    const f=$('#in-from').value, t=$('#in-to').value;
+    if(src.validity&&src.validity.from&&(padDM(src.validity.from)!==padDM(f)||padDM(src.validity.to)!==padDM(t))&&!(S.ckIgnore||[]).includes('validade'))
+      ckAdd({lvl:'warn',key:'validade',gi:null,it:null,msg:`Validade: o cliente mandou ${padDM(src.validity.from)} a ${padDM(src.validity.to)}; nas artes está ${f||'—'} a ${t||'—'}.`});
+    const cities=citiesOf(src.cities||''); const band=$('#in-cities').value;
+    if(cities&&norm(band)&&!norm(band).includes(norm(cities).replace(/^oferta valida (somente )?para /,''))&&!(S.ckIgnore||[]).includes('tarja'))
+      ckAdd({lvl:'warn',key:'tarja',gi:null,it:null,msg:`Tarja: o cliente mandou "${cities}" e a tarja está "${band}".`});
+  }
+  // marcas nas linhas
+  for(const r of CK.res) if(r.it){ const k=okey(r.gi,r.it); const p=CK.byRow.get(k); if(!p||r.lvl==='err'||(r.lvl==='warn'&&p==='info')) CK.byRow.set(k,r.lvl); }
+  return CK.res;
+}
+function fmtP(v){ return v==null?'':v.toFixed(2).replace('.',','); }
+
+// ---------- janela ----------
+function ckOpen(){
+  if(!S.grids.length){ toast('Abra primeiro um trabalho.','err'); return; }
+  ckRun(); ckList(); $('#conf').showModal(); ckMarkAll();
+}
+function ckList(){
+  const box=$('#ck-list'); box.innerHTML='';
+  const n={err:0,warn:0,info:0}; for(const r of CK.res) n[r.lvl]++;
+  const src=S.src&&S.src.lines&&S.src.lines.length;
+  $('#ck-sum').innerHTML=''; $('#ck-sum').append(...[
+    n.err?el('span',{class:'ck-pill err'},`${n.err} erro${n.err>1?'s':''}`):null,
+    n.warn?el('span',{class:'ck-pill warn'},`${n.warn} aviso${n.warn>1?'s':''}`):null,
+    !n.err&&!n.warn?el('span',{class:'ck-pill ok'},'Tudo confere ✓'):null,
+    el('span',{class:'st'},src?`comparado com: ${S.src.name||'planilha/texto do cliente'}`:'Sem a planilha/texto original deste trabalho: conferi só imagens e preços das artes.')].filter(Boolean));
+  const show=CK.res.filter(r=>CK.filter==='all'||r.lvl!=='info');
+  document.querySelectorAll('#ck-filter button').forEach(b=>b.classList.toggle('on',b.dataset.f===CK.filter));
+  if(!show.length){ box.append(el('div',{class:'empty-state'},n.info&&CK.filter!=='all'?'Nenhum erro ou aviso. (Há observações em "Tudo".)':'Nenhum problema encontrado.')); return; }
+  const groups=new Map(); for(const r of show){ const k=r.gi==null?'geral':'g'+r.gi; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r); }
+  const order=['geral',...S.grids.map((g,gi)=>'g'+gi)];
+  for(const k of order){ const rs=groups.get(k); if(!rs) continue;
+    box.append(el('h4',{class:'ck-gh'},k==='geral'?'Geral / produtos do cliente':`Arte ${+k.slice(1)+1} · ${S.grids[+k.slice(1)].label||''}`));
+    const byIt=new Map(); for(const r of rs){ const kk=r.it?okey(r.gi,r.it):'x'+byIt.size; if(!byIt.has(kk)) byIt.set(kk,[]); byIt.get(kk).push(r); }
+    for(const list of byIt.values()){ const r0=list[0]; const it=r0.it;
+      const lvl=list.some(r=>r.lvl==='err')?'err':list.some(r=>r.lvl==='warn')?'warn':'info';
+      const th=el('canvas',{width:72,height:72,class:'ck-th'}); const imgId=(list.find(r=>r.img)||{}).img||(it&&it.imgIds&&it.imgIds[0]);
+      if(imgId) getImage(imgId).then(im=>{ if(!im) return; const x=th.getContext('2d'); const s=Math.min(68/im.width,68/im.height); x.drawImage(im,(72-im.width*s)/2,(72-im.height*s)/2,im.width*s,im.height*s); });
+      const msgs=el('div',{class:'ck-msgs'});
+      for(const r of list) msgs.append(el('div',{class:'ck-m '+r.lvl},el('span',{class:'ck-dot'}),el('span',{},r.msg),
+        r.fix?el('button',{class:'btn sm',onclick:()=>ckFix(r)},'Usar "'+r.fix.name+'"'):null,
+        el('button',{class:'lnk',title:'Está certo assim: não avisar mais',onclick:()=>ckIgnore(r)},'está certo')));
+      const line=(list.find(r=>r.line)||{}).line;
+      if(!it&&r0.key&&r0.key.startsWith('linha:')&&r0.lvl==='err'){ const sel=el('select',{},...S.grids.map((g,gi)=>el('option',{value:gi},`Arte ${gi+1}`)));
+        msgs.append(el("div",{class:"ck-m ck-add"},el("span",{},"Incluir na"),sel,el('button',{class:'btn sm',onclick:()=>ckAddLine(line,+sel.value)},'Incluir produto'))); }
+      box.append(el('div',{class:'ck-item '+lvl},imgId?th:el('div',{class:'ck-th'}),
+        el('div',{class:'ck-body'},
+          it?el('div',{class:'ck-nm'},el('b',{},(it.slot||'—')+' · '),it.name||'(sem nome)',' ',el('span',{class:'st'},[it.price!=null?'R$ '+fmtP(it.price):'',it.club!=null?'clube R$ '+fmtP(it.club):''].filter(Boolean).join(' · '))):null,
+          msgs, line?el('div',{class:'ck-line'},el('span',{},'Cliente: '),line):null),
+        it?el('div',{class:'ck-acts'},el('button',{class:'btn sm',onclick:()=>ckGo(r0.gi,it)},'Ir para o produto'),el('button',{class:'lnk',onclick:()=>{ $('#conf').close(); openPicker(r0.gi,it,0); }},'trocar imagem')):null));
+    }
+  }
+}
+function ckAddLine(line,gi){ const p=parseItemLine(ckPre(line).replace(/\s\|\s/g,' ')); if(!p){ toast('Não consegui ler essa linha; inclua pelo + Produto.','err'); return; }
+  const g=S.grids[gi]; const i=Math.max(-1,...g.items.map(x=>x.i))+1;
+  const it={...p,i,raw0:p.raw,name:fixAccents(p.name),imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:p.name,price:p.price,club:p.club,unit:p.unit}};
+  activate(g); it.slot=freeSlot(g); g.items.push(it); autoPickImages(it); buildRows(gi); renderSoon(gi); jobChanged();
+  toast(it.slot?`Incluído na arte ${gi+1} (posição ${it.slot}).`:`Incluído, mas a arte ${gi+1} está cheia: escolha a posição.`, it.slot?'':'err'); ckRefresh(); }
+function ckRefresh(){ ckRun(); ckList(); ckMarkAll(); }
+function ckFix(r){ const it=r.it, gi=r.gi; const ids=[...it.imgIds]; ids[r.fix.pos]=r.fix.id; if(it.rot){ delete it.rot[r.fix.pos]; } it.imgIds=ids; it.conf='mem'; remember(it,{imgs:it.imgIds,rot:it.rot||{}}); buildRows(gi); renderSoon(gi); toast('Imagem trocada.'); ckRefresh(); }
+function ckIgnore(r){ if(r.it){ r.it.ckIgnore=[...(r.it.ckIgnore||[]),r.key]; } else S.ckIgnore=[...(S.ckIgnore||[]),r.key]; if(typeof jobChanged==='function') jobChanged(); ckRefresh(); }
+function ckGo(gi,it){ $('#conf').close(); openRow(gi,it,true); buildRows(gi); setActiveRow(gi,it); const r=$(`#row-${gi}-${it.i}`); if(r){ r.scrollIntoView({block:'center',behavior:'smooth'}); r.classList.add('ck-flash'); setTimeout(()=>r.classList.remove('ck-flash'),1600); } }
+function ckMarkAll(){ S.grids.forEach((g,gi)=>ckMarkRows(gi)); const n=CK.res.filter(r=>r.lvl==='err').length, w=CK.res.filter(r=>r.lvl==='warn').length; const b=$('#btn-check'); if(b){ b.textContent=n||w?`Conferir (${n?n+' erro'+(n>1?'s':''):w+' aviso'+(w>1?'s':'')})`:'Conferir ✓'; b.classList.toggle('ck-bad',!!n); } }
+function ckMarkRows(gi){ const g=S.grids[gi]; if(!g||!CK.byRow.size) return; for(const it of g.items){ const r=$(`#row-${gi}-${it.i}`); if(!r) continue; r.classList.remove('ck-err','ck-warn'); const l=CK.byRow.get(okey(gi,it)); if(l==='err'||l==='warn') r.classList.add('ck-'+l); } }
+function ckInit(){
+  $('#btn-check').onclick=ckOpen; $('#ck-close').onclick=()=>$('#conf').close(); $('#ck-again').onclick=ckRefresh;
+  document.querySelectorAll('#ck-filter button').forEach(b=>b.onclick=()=>{ CK.filter=b.dataset.f; ckList(); });
+}
+
 // ---------- Google Drive pela conta Google (funciona em qualquer navegador e no celular) ----------
 // O app usa a API do Drive com o login Google do próprio usuário. As pastas do Drive viram "pastas" iguais às do
 // computador (mesmos métodos do File System Access), então banco, trabalhos e memória usam o mesmo código.
@@ -2892,7 +3118,7 @@ function sigOf(g){
     g.items.filter(i=>i.slot&&!i.removed).map(i=>[i.slot,i.name,i.unit,i.price,i.club,i.note,i.imgIds,i.rot,i.variant,i.adj,i.iadj,i.namePos,i.sh,i.hlt,i.hadj]).sort(), g.nameCase, g.nameSize ]);
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
-function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
+function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
   grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
@@ -2930,7 +3156,7 @@ async function openJobsDialog(){
   }
 }
 async function openSavedJob(name,job){
-  S.sheet=null; S.sheetName=name; S.jobTitle=job.title||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
+  S.sheet=null; S.sheetName=name; S.src=job.src||null; S.ckIgnore=job.ckIgnore||[]; CK.byRow=new Map(); S.jobTitle=job.title||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
@@ -3020,7 +3246,7 @@ function addItem(gi){
 // ---- planilha corrigida: compara e aplica, mantendo imagens/posições ----
 async function applyRevision(file){
   try{
-    const sh=parseOfferSheet(await readXlsx(await file.arrayBuffer()));
+    const rows=await readXlsx(await file.arrayBuffer()); const sh=parseOfferSheet(rows); setSource(srcFromRows(rows),{name:file.name,cities:sh.cities||'',validity:sh.validity||null});
     const log=[];
     sh.grids.forEach((ng,gi)=>{
       const g=S.grids[gi]; if(!g){ log.push(`Arte ${gi+1}: nova na planilha (não aplicada — abra a planilha nova do zero)`); return; }
@@ -3126,11 +3352,13 @@ function applyChanges(){
       const it={i,raw:a.name,raw0:'',name:a.name,unit:u,price:a.price,club:a.club,note:'',imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:'',price:null,club:null,unit:u}};
       it.slot=freeSlot(g); g.items.push(it); autoPickImages(it); touched.add(0); n++; continue; }
     const {gi,it}=a.hit; touched.add(gi); n++;
+    if(a.type!=='add'&&a.type!=='remove') it.cliChg=true;
     if(a.type==='price'){ if(a.price!=null) it.price=a.price; if(a.clubSet) it.club=a.club; }
     if(a.type==='remove'&&!it.removed){ it.removed=true; it.prevSlot=it.slot; it.slot=''; }
     if(a.type==='unit'){ it.name=it.name.replace(/(\d+(?:[.,]\d+)?)\s*(ML|G|GR|KG|L|LT)\b/i,(m0,v)=>v+a.to); }
     if(a.type==='replace'){ it.name=fixAccents(a.name); it.raw=a.name; if(/\bKG$/i.test(a.name)) it.unit='KG'; if(a.price!=null) it.price=a.price; it.club=a.club; autoPickImages(it); }
   }
+  if(S.src){ S.src.changes=[...(S.src.changes||[]),$('#chg-text').value]; }
   $('#changes').close();
   buildGridUI(); renderAll(); jobChanged();
   toast(`${n} alteração(ões) aplicada(s). Confira as artes marcadas.`);
@@ -3157,6 +3385,7 @@ async function sendToVideo(){
   }catch(e){ if(win) win.close(); console.error(e); toast('Não consegui abrir o vídeo: '+e.message,'err'); }
 }
 // [VIDEO] ---- fim do bloco do chat dos vídeos ----
+
 // ---------- storage ----------
 const IDB={db:null,
   async open(){ if(this.db) return this.db; this.db=await new Promise((res,rej)=>{ const r=indexedDB.open('gerador-ofertas',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return this.db; },
@@ -3316,8 +3545,8 @@ function autoPickImages(it){
 }
 async function loadSheetBuffer(buf,name){
   let sh, replayFile=false;
-  if(/\.(docx|odt)$/i.test(name)){ sh=parseTextOffers(await readDocLines(buf,name),name); replayFile=true; }
-  else { const rows=await readXlsx(buf); if(isBigolinRows(rows)){ sh=parseBigolinRows(rows,name); replayFile=true; } else sh=parseOfferSheet(rows); }
+  if(/\.(docx|odt)$/i.test(name)){ const L=await readDocLines(buf,name); sh=parseTextOffers(L,name); replayFile=true; sh.srcLines=L; }
+  else { const rows=await readXlsx(buf); if(isBigolinRows(rows)){ sh=parseBigolinRows(rows,name); replayFile=true; } else sh=parseOfferSheet(rows); sh.srcLines=srcFromRows(rows); }
   return applySheet(sh,name,replayFile,null,()=>loadSheetBuffer(buf,name));
 }
 // pasted text (WhatsApp / e-mail): same parser as the Word files
@@ -3327,12 +3556,12 @@ async function loadPastedText(text,forced){
   let h=0; for(const ch of text) h=(h*31+ch.charCodeAt(0))|0;
   const name='Texto · '+first+' #'+(h>>>0).toString(36);
   const sh=parseTextOffers(lines,'');
-  sh.title=sh.title||first;
+  sh.title=sh.title||first; sh.srcLines=lines;
   return applySheet(sh,name,true,forced||null,()=>loadPastedText(text,forced));
 }
 async function applySheet(sh,name,replayFile,forced,reload){
   if(!sh.grids.length) throw new Error('Não encontrei produtos com preço no arquivo.');
-  S.sheet=sh; S.sheetName=name;
+  S.sheet=sh; S.sheetName=name; setSource(sh.srcLines,{cities:sh.cities||'',validity:sh.validity||null}); S.ckIgnore=[]; CK.byRow=new Map();
   const job0=await IDB.get('job:'+name);
   S.jobTitle=(job0&&job0.title)||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   let T0;
@@ -3364,7 +3593,7 @@ async function applySheet(sh,name,replayFile,forced,reload){
   $('#in-from').value=sh.validity?sh.validity.from:''; $('#in-to').value=sh.validity?sh.validity.to:'';
   autoBand(true);
   const job=await IDB.get('job:'+name); let resumed=false;
-  if(job&&job.grids&&job.grids.length===S.grids.length&&!loadSheetBuffer.fresh){ restoreJob(job); resumed=true;
+  if(job&&job.grids&&job.grids.length===S.grids.length&&!loadSheetBuffer.fresh){ restoreJob(job); resumed=true; if(job.src&&job.src.changes) S.src.changes=job.src.changes; S.ckIgnore=job.ckIgnore||[];
     // destaques vêm sempre da planilha; trabalhos salvos antes desta versão têm as posições refeitas
     S.grids.forEach((g,gi)=>{ const hk=new Set(sh.grids[gi].items.filter(x=>x.hl).map(x=>keyOf(x.raw)));
       g.items.forEach(it=>{ if(!it.added) it.hl=hk.has(keyOf(it.raw0)); });
@@ -3594,6 +3823,7 @@ function buildRows(gi){
   }
   if(removed.length) box.append(el('div',{class:'removed'},el('b',{},'Fora da arte: '),...removed.map(it=>el('span',{class:'chip'},it.name||'(sem nome)',' ',el('button',{class:'lnk',onclick:()=>unremoveItem(gi,it)},'voltar')))));
   refreshThumbs(gi);
+  if(typeof ckMarkRows==="function") ckMarkRows(gi);
 }
 async function refreshThumbs(gi){
   const g=S.grids[gi]; let issues=0;
@@ -3855,7 +4085,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   $('#ni-sharp').onchange=()=>NI&&runRemoval(NI.mode);
   for(const id of ['ni-bri','ni-con']) $('#'+id).oninput=()=>{ cancelAnimationFrame(applyBC.r); applyBC.r=requestAnimationFrame(applyBC); };
   $('#ni-bcr').onclick=()=>{ $('#ni-bri').value=0; $('#ni-con').value=0; applyBC(); };
-  bvInit(); $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
+  bvInit(); ckInit(); $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
   $('#file-lib2').onchange=e=>addLibraryFromFiles(e.target.files);
   for(const id of ['in-cities','in-from','in-to']) $('#'+id).addEventListener('input',()=>{ if(id!=='in-cities') autoBand();
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
