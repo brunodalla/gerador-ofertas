@@ -100,7 +100,7 @@ function setItemImg(it,blob,file){ it.img=blob; V.imgs.delete(it.id); if(file){ 
 async function autoImage(it){
   if(it.img||!BANK.items.length) return false;
   const mem=IMGMEM[E.norm(it.name)]; let f=mem?await bankFile(mem):null;
-  if(!f){ const r=bankSearch(it.name,1)[0]; if(r&&r.score>=0.55) f=await r.it.handle.getFile(); }
+  if(!f){ const r=bankSearch(it.name,1)[0]; if(r&&r.score>=0.7) f=await r.it.handle.getFile(); }
   if(f){ it.img=f; V.imgs.delete(it.id); return true; } return false;
 }
 async function bankStatus(interactive=false){
