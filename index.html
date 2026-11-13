@@ -152,10 +152,60 @@ body.mobile .desk,body.nofs .desk{display:none!important}
  #toasts{left:10px;right:10px} .toast{max-width:none}
  .jobrow{flex-wrap:wrap}
 }
+
+header{flex-wrap:wrap}
+.tabs{display:flex;gap:4px;margin-left:auto;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tabs button{background:none;border:0;color:var(--mut);font:inherit;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer}
+.tabs button.on{background:var(--orbg);color:var(--or2)}
+#bankview{display:none;padding:0 24px 40px;max-width:1500px;margin:0 auto}
+body.bankmode main{display:none} body.bankmode #bankview{display:block}
+#bankview [hidden]{display:none!important}
+.bk-selbar{flex-wrap:wrap}
+#bankview.drop{outline:2px dashed var(--or);outline-offset:-6px;border-radius:var(--r)}
+.bk-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.bk-bar input[type=search]{flex:1 1 280px;min-width:200px;font-size:15px;padding:10px 12px}
+.bk-sub{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+.bk-sub #bk-count{color:var(--ink);font-weight:600}
+.bk-selbar{display:flex;gap:12px;align-items:center;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:8px 12px;margin-bottom:12px;position:sticky;top:6px;z-index:5}
+.btn.bad{border-color:rgba(255,107,94,.45);color:var(--bad)}
+#bk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.bk-gh{grid-column:1/-1;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-top:10px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.bk-card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s}
+.bk-card:hover{border-color:var(--line2);transform:translateY(-1px)} .bk-card.sel{border-color:var(--or);box-shadow:0 0 0 1px var(--or)}
+.bk-th{position:relative;aspect-ratio:1;background:#fff;background-image:linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%),linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.bk-th canvas{width:100%;height:100%;display:block}
+.bk-chk{position:absolute;top:8px;left:8px;width:20px;height:20px;accent-color:var(--or);opacity:.55}
+.bk-card:hover .bk-chk,.bk-chk:checked{opacity:1}
+.bk-nm{padding:8px 10px 2px;font-size:13px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}
+.bk-meta{display:flex;flex-wrap:wrap;gap:4px;padding:4px 10px 10px;font-size:11px}
+.bk-age,.bk-tag{padding:2px 7px;border-radius:99px;background:var(--card2);color:var(--mut);white-space:nowrap}
+.bk-age.new{background:var(--okbg);color:var(--ok)} .bk-age.mid{background:var(--warnbg);color:var(--warn)} .bk-age.old{background:var(--badbg);color:var(--bad)}
+.bk-tag.ok{background:var(--okbg);color:var(--ok)} .bk-tag.warn{background:var(--warnbg);color:var(--warn)} .bk-tag.mut{opacity:.7}
+.bk-more{grid-column:1/-1;justify-self:center}
+#bk-item{padding:0} .bki{display:grid;grid-template-columns:minmax(260px,520px) minmax(280px,420px);gap:18px;padding:18px;max-width:94vw}
+.bki-im{border-radius:12px;overflow:hidden;background:#fff;background-image:linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%),linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%);background-size:20px 20px;background-position:0 0,10px 10px}
+.bki-im canvas{width:100%;height:auto;display:block}
+.bki-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bki-nm{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--mut)} .bki-nm span{display:flex;gap:6px} .bki-nm input{flex:1;font-size:15px}
+.bki-info{display:flex;flex-direction:column;gap:5px;font-size:13px} .bki-info b{color:var(--mut);font-weight:500}
+.bki-acts{display:flex;gap:8px;flex-wrap:wrap}
+#bki-vers h4{margin:6px 0;font-size:12px;color:var(--mut);font-weight:500}
+.bk-vrow{display:flex;gap:8px;flex-wrap:wrap}
+.bk-v{width:110px;display:flex;flex-direction:column;gap:2px;cursor:pointer;font-size:11px}
+.bk-v canvas{width:110px;height:110px;background:#fff;border-radius:8px}
+.bk-v small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bku-list{display:flex;flex-direction:column;gap:10px;margin:12px 0;max-height:62vh;overflow:auto}
+.bku-row{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:start;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px}
+.bku-th canvas{width:120px;height:120px;background:#fff;border-radius:8px}
+.bku-f{display:flex;flex-direction:column;gap:6px;min-width:0} .bku-f input,.bku-f select{width:100%}
+.bku-a{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .bku-sug{display:flex;gap:6px;align-items:center} .bku-sug canvas{width:56px;height:56px;background:#fff;border-radius:6px}
+#newimg.bkmode #ni-ps,#newimg.bkmode .nm2{display:none}
+@media (max-width:760px){ #bankview{padding:0 12px 30px} .tabs{margin-left:0;width:100%} .tabs button{flex:1} #bk-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+ .bki{grid-template-columns:1fr} .bku-row{grid-template-columns:80px 1fr auto} .bku-th canvas{width:80px;height:80px} }
 </style></head>
 <body>
 <div id="boot">Carregando…</div>
-<header><div class="mk">%</div><div><h1>GERADOR DE OFERTAS</h1><p>Planilha ou texto do cliente → artes prontas</p></div></header>
+<header><div class="mk">%</div><div><h1>GERADOR DE OFERTAS</h1><p>Planilha ou texto do cliente → artes prontas</p></div><nav class="tabs"><button data-tab="offers" class="on">Ofertas</button><button data-tab="bank">Banco de imagens</button></nav></header>
 <main>
   <div class="steps">
     <div class="step" id="step1"><h3><b>1</b>Planilha</h3>
@@ -189,6 +239,37 @@ body.mobile .desk,body.nofs .desk{display:none!important}
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
   <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
+<section id="bankview">
+  <div id="bk-conn" class="step"><h3>Banco de imagens</h3><div class="st">Conecte o banco para ver, buscar, trocar e enviar imagens de produtos.</div>
+    <div class="acts"><button class="btn pri desk" id="bk-connect">Abrir pasta do BANCO DE PRODUTOS</button><button class="lnk desk" id="bk-connect2">outra pasta</button><button class="btn" id="bk-google">Entrar com Google</button></div></div>
+  <div id="bk-tools" hidden>
+    <div class="bk-bar">
+      <input id="bk-q" type="search" placeholder="Buscar produto no banco… (ex.: coca 2l, picanha)">
+      <select id="bk-filter" title="Filtrar">
+        <option value="all">Todas</option><option value="new">Recentes (até 6 meses)</option><option value="old">Antigas (mais de 1 ano)</option>
+        <option value="dup">Produtos com mais de uma versão</option><option value="older">Versões desatualizadas (tem uma mais nova)</option>
+        <option value="unused">Nunca usadas nas ofertas</option><option value="oldunused">Antigas e nunca usadas (boas para excluir)</option></select>
+      <select id="bk-sort" title="Ordem"><option value="new">Mais novas primeiro</option><option value="old">Mais antigas primeiro</option><option value="az">Nome (A–Z)</option><option value="rel">Mais parecidas com a busca</option></select>
+      <button class="btn pri" id="bk-upbtn">Enviar imagens novas</button>
+    </div>
+    <div class="bk-sub"><span class="st" id="bk-count"></span><span class="st" id="bk-src"></span><span class="st bk-hint desk">Clique numa imagem para ver, trocar, renomear ou excluir. Dá para arrastar fotos para esta tela.</span>
+      <details id="bk-old" class="more"><summary>versões antigas guardadas</summary><span class="st" id="bk-oldst"></span> <button class="lnk" id="bk-oldclr">esvaziar _antigas</button></details></div>
+    <div id="bk-selbar" class="bk-selbar" hidden><b id="bk-seln"></b><button class="lnk" id="bk-selall">selecionar todas da tela</button><button class="lnk" id="bk-selnone">limpar seleção</button><span style="flex:1"></span><button class="btn bad" id="bk-seldel">Excluir selecionadas</button></div>
+  </div>
+  <div id="bk-grid"></div>
+</section>
+<dialog id="bk-item"><div class="bki">
+  <div class="bki-im chk"><canvas id="bki-img" width="520" height="520"></canvas></div>
+  <div class="bki-side">
+    <label class="bki-nm">Nome do produto<span><input id="bki-name"><button class="btn" id="bki-ren">Renomear</button></span></label>
+    <div id="bki-info" class="bki-info"></div>
+    <div class="bki-acts"><button class="btn pri" id="bki-rep">Trocar imagem…</button><button class="btn bad" id="bki-del">Excluir do banco</button><span style="flex:1"></span><button class="btn" id="bki-close">Fechar</button></div>
+    <div id="bki-vers"></div>
+  </div></div></dialog>
+<dialog id="bk-up"><div style="padding:16px 18px;width:min(860px,94vw)"><h3 style="margin:0 0 6px">Enviar imagens para o banco</h3>
+  <div class="st">Dê o nome do produto para cada foto e escolha se ela é uma imagem nova ou se substitui uma antiga (a antiga fica guardada em _antigas). O fundo branco sai sozinho; use "Ajustar recorte" para a IA ou brilho/contraste.</div>
+  <div id="bku-list"></div>
+  <div class="nia"><button class="btn" id="bku-add">+ adicionar mais fotos</button><span style="flex:1"></span><button class="btn" id="bku-cancel">Cancelar</button><button class="btn pri" id="bku-save">Salvar no banco</button></div></div></dialog>
 <dialog id="picker"><div class="pkh"><input id="pk-q" placeholder="Buscar produto na biblioteca…"><button class="btn" id="pk-close">Fechar</button></div><div id="pk-title"></div><div id="pk-res"></div></dialog>
 <dialog id="newimg"><div class="nih"><b>Nova imagem</b><span id="ni-prod"></span></div>
   <div class="nib">
@@ -2159,6 +2240,7 @@ async function loadBank(){
   S.lib.items=items; S.lib.byId=new Map(items.map(i=>[i.id,i])); S.lib.sources=[BANK.name+' (Google Drive)']; if(BANK.dir.refresh) BANK.dir.refresh(); S.lib.index=buildIndex(items);
   setStatus('st-lib',`${items.length} imagens · ${BANK.name}`,items.length>0);
   $('#btn-bank').textContent='Banco conectado ✓';
+  if(document.body.classList.contains('bankmode')) bvRender();
   if(S.grids.length){ for(const g of S.grids) for(const it of g.items) autoPickImages(it); for(let i=0;i<S.grids.length;i++) buildRows(i); await renderAll(); }
 }
 async function saveToBank(name,blob,origem){
@@ -2334,7 +2416,8 @@ async function pollPhotoshop(){
 function resumePhotoshop(){ S.grids.forEach((g,gi)=>g.items.forEach(it=>{ if(it.psPending&&it.psFile&&!PSQ.some(q=>q.it===it)) PSQ.push({gi,it,file:it.psFile,name:it.psFile.replace(/\.png$/i,''),t:it.psT||0}); else if(it.psPending&&!it.psFile) it.psPending=false; }));
   if(PSQ.length&&!PSQ_T) PSQ_T=setInterval(pollPhotoshop,3000); }
 async function saveNewImage(){
-  if(!NI||!NI.out) return; const {gi,it}=NI; const name=$('#ni-name').value.trim()||it.name;
+  if(!NI||!NI.out) return;
+  if(NI.bankCb){ const cb=NI.bankCb, out=NI.out; $('#newimg').close(); NI=null; return cb(out); } const {gi,it}=NI; const name=$('#ni-name').value.trim()||it.name;
   const blob=await new Promise(r=>NI.out.toBlob(r,'image/png'));
   let id;
   if(BANK.dir){ try{ id=await saveToBank(name,blob,NI.mode==='ia'?'google+ia':'app'); }catch(e){ toast('Não consegui salvar no banco: '+e.message,'err'); } }
@@ -2346,12 +2429,297 @@ async function saveNewImage(){
   toast(BANK.dir?`Imagem salva no banco como "${safeFileName(name)}.png".`:'Imagem aplicada (conecte o banco para guardar no Google Drive).');
 }
 async function handlePaste(e){
+  if(document.body.classList.contains('bankmode')){ const f=[...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/')).map(i=>i.getAsFile()).filter(Boolean); if(f.length&&BANK.dir){ e.preventDefault(); bvUpload(f.map((x,i)=>new File([x],x.name&&x.name!=='image.png'?x.name:`imagem colada ${i+1}.png`,{type:x.type}))); } return; }
   if(!ACTIVE) return; if(document.activeElement&&/INPUT|TEXTAREA/.test(document.activeElement.tagName)&&!e.clipboardData.files.length) return;
   const items=[...(e.clipboardData?.items||[])];
   const fi=items.find(i=>i.type.startsWith('image/'));
   if(fi){ e.preventDefault(); return openNewImage(ACTIVE.gi,ACTIVE.it,fi.getAsFile()); }
   const html=e.clipboardData.getData('text/html'); const m=/<img[^>]+src="([^"]+)"/i.exec(html||'');
   if(m){ e.preventDefault(); try{ const r=await fetch(m[1]); if(!r.ok) throw 0; return openNewImage(ACTIVE.gi,ACTIVE.it,await r.blob()); }catch(err){ toast('O site não deixou copiar essa imagem. No Google, abra a imagem grande e use "Copiar imagem".','err'); } }
+}
+
+// ---------- Aba "Banco de imagens": ver, buscar, trocar, renomear, enviar e excluir imagens do banco ----------
+const BV={q:'',filter:'all',sort:'new',shown:120,sel:new Set(),thumbs:new Map(),queue:[],busy:0,up:[]};
+const DAY=864e5;
+function bvAge(ms){ if(!ms) return {cls:'old',txt:'sem data'}; const d=(Date.now()-ms)/DAY;
+  if(d<=180) return {cls:'new',txt:'recente'}; if(d<=540) return {cls:'mid',txt:'mais de 6 meses'}; return {cls:'old',txt:d>730?'mais de 2 anos':'mais de 1 ano e meio'}; }
+function bvKey(n){ return norm(n||'').replace(/\(\d+\)/g,' ').replace(/\b(novo|nova|new|copia|v\d+|final)\b/g,' ').replace(/\s\d+\s*$/,'').replace(/\s+/g,' ').trim(); }
+function bvFile(it){ return it.id.startsWith('b:')?it.id.slice(2):null; }
+function bvEditable(it){ return !!(BANK.dir&&it&&it.src==='banco'); }
+function bvFmtSize(b){ return !b?'':b>1048576?(b/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+// quantas vezes cada imagem foi usada (memória dos produtos + artes abertas)
+function bvUsage(){ const u=new Map(); const add=id=>u.set(id,(u.get(id)||0)+1);
+  for(const m of Object.values(MEM)) for(const id of (m&&m.imgs)||[]) add(id);
+  for(const g of S.grids) for(const it of g.items){ const m=MEM[keyOf(it.raw)]; for(const id of it.imgIds||[]) if(!(m&&m.imgs&&m.imgs.includes(id))) add(id); }
+  return u; }
+function bvGroups(items){ const g=new Map(); for(const it of items){ const k=bvKey(it.name); if(!k) continue; if(!g.has(k)) g.set(k,[]); g.get(k).push(it); }
+  const newer=new Map(); for(const arr of g.values()) if(arr.length>1){ arr.sort((a,b)=>(b.mod||0)-(a.mod||0)); arr.forEach((x,i)=>newer.set(x.id,i===0?'newest':'older')); } return newer; }
+
+function bvShow(on){
+  document.body.classList.toggle('bankmode',on);
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',(b.dataset.tab==='bank')===on));
+  if(on) bvRender(); window.scrollTo(0,0);
+}
+function bvList(){
+  const usage=bvUsage(), newer=bvGroups(S.lib.items);
+  let arr=S.lib.items.map(it=>({it,used:usage.get(it.id)||0,ver:newer.get(it.id)||''}));
+  const q=BV.q.trim();
+  if(q){ const res=search(S.lib.index,q,400).filter(r=>r.score>0.25); const sc=new Map(res.map(r=>[r.item.id,r.score])); const qn=norm(q);
+    arr=arr.filter(x=>sc.has(x.it.id)||norm(x.it.name).includes(qn)); if(BV.sort==='rel') arr.sort((a,b)=>(sc.get(b.it.id)||0)-(sc.get(a.it.id)||0)); }
+  const f=BV.filter, now=Date.now();
+  if(f==='new') arr=arr.filter(x=>x.it.mod&&now-x.it.mod<=180*DAY);
+  if(f==='old') arr=arr.filter(x=>!x.it.mod||now-x.it.mod>365*DAY);
+  if(f==='dup') arr=arr.filter(x=>x.ver);
+  if(f==='older') arr=arr.filter(x=>x.ver==='older');
+  if(f==='unused') arr=arr.filter(x=>!x.used);
+  if(f==='oldunused') arr=arr.filter(x=>!x.used&&(!x.it.mod||now-x.it.mod>365*DAY));
+  if(BV.sort==='new') arr.sort((a,b)=>(b.it.mod||0)-(a.it.mod||0));
+  if(BV.sort==='old') arr.sort((a,b)=>(a.it.mod||0)-(b.it.mod||0));
+  if(BV.sort==='az') arr.sort((a,b)=>a.it.name.localeCompare(b.it.name,'pt-BR'));
+  if(BV.sort==='rel'&&!q) arr.sort((a,b)=>(b.it.mod||0)-(a.it.mod||0));
+  if(f==='dup') arr.sort((a,b)=>bvKey(a.it.name).localeCompare(bvKey(b.it.name),'pt-BR')||(b.it.mod||0)-(a.it.mod||0));
+  return arr;
+}
+function bvRender(){
+  const box=$('#bk-grid'); if(!box) return;
+  const conn=!!BANK.dir, n=S.lib.items.length;
+  $('#bk-conn').hidden=conn&&n>0; $('#bk-tools').hidden=!n;
+  $('#bk-src').textContent=conn?`${BANK.name}${BANK.dir instanceof GDir?' · Google Drive':' · pasta do computador'}`:(n?S.lib.sources.join(' + ')+' (só leitura)':'');
+  $('#bk-upbtn').hidden=!conn; $('#bk-old').hidden=!conn;
+  box.innerHTML=''; if(!n){ $('#bk-count').textContent=''; bvSel(); return; }
+  const arr=bvList(); const ids=new Set(arr.map(x=>x.it.id)); for(const id of [...BV.sel]) if(!ids.has(id)) BV.sel.delete(id);
+  const all=S.lib.items.length; $('#bk-count').textContent=arr.length===all?`${all} imagens`:`${arr.length} de ${all} imagens`;
+  let lastKey=null;
+  for(const x of arr.slice(0,BV.shown)){
+    if(BV.filter==='dup'){ const k=bvKey(x.it.name); if(k!==lastKey){ box.append(el('div',{class:'bk-gh'},k)); lastKey=k; } }
+    box.append(bvCard(x));
+  }
+  if(arr.length>BV.shown) box.append(el('button',{class:'btn bk-more',onclick:()=>{ BV.shown+=240; bvRender(); }},`Mostrar mais (${arr.length-BV.shown} restantes)`));
+  if(!arr.length) box.append(el('div',{class:'empty-state'},'Nada encontrado com essa busca/filtro.'));
+  bvSel();
+}
+function bvCard({it,used,ver}){
+  const age=bvAge(it.mod); const ed=bvEditable(it);
+  const cv=el('canvas',{width:220,height:220,'data-id':it.id});
+  const chk=ed?el('input',{type:'checkbox',class:'bk-chk',title:'Selecionar',onclick:e=>{ e.stopPropagation(); e.target.checked?BV.sel.add(it.id):BV.sel.delete(it.id); card.classList.toggle('sel',e.target.checked); bvSel(); }}):null;
+  if(chk&&BV.sel.has(it.id)) chk.checked=true;
+  const card=el('div',{class:'bk-card'+(BV.sel.has(it.id)?' sel':''),title:it.name,onclick:()=>bvOpen(it)},
+    el('div',{class:'bk-th'},cv,chk),
+    el('div',{class:'bk-nm'},it.name),
+    el('div',{class:'bk-meta'},el('span',{class:'bk-age '+age.cls},fmtDate(it.mod)||'sem data'),
+      ver==='newest'?el('span',{class:'bk-tag ok'},'mais nova'):ver==='older'?el('span',{class:'bk-tag warn'},'tem versão mais nova'):null,
+      used?el('span',{class:'bk-tag'},`usada ${used}×`):el('span',{class:'bk-tag mut'},'não usada')));
+  bvObserve(cv,it); return card;
+}
+// miniaturas: guardadas no navegador para abrir rápido nas próximas vezes
+let BVIO=null;
+function bvObserve(cv,it){ if(!BVIO) BVIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ BVIO.unobserve(e.target); const id=e.target.dataset.id; const item=S.lib.byId.get(id); if(item) bvThumb(item).then(b=>b&&bvPaint(e.target,b)); } },{rootMargin:'400px'});
+  const p=BV.thumbs.get(it.id+'|'+(it.mod||0)); if(p) p.then(b=>b&&bvPaint(cv,b)); else BVIO.observe(cv); }
+function bvPaint(cv,bmp){ const x=cv.getContext('2d'); x.clearRect(0,0,cv.width,cv.height); const s=Math.min((cv.width-12)/bmp.width,(cv.height-12)/bmp.height,1.5); const w=bmp.width*s,h=bmp.height*s; x.imageSmoothingQuality='high'; x.drawImage(bmp,(cv.width-w)/2,(cv.height-h)/2,w,h); }
+async function bvThumb(it){
+  const k=it.id+'|'+(it.mod||0); if(BV.thumbs.has(k)) return BV.thumbs.get(k);
+  const p=(async()=>{
+    const blob=await IDB.get('th:'+k); if(blob) try{ return await createImageBitmap(blob); }catch(e){}
+    while(BV.busy>=4) await new Promise(r=>BV.queue.push(r)); BV.busy++;
+    try{ const src=S.imgCache.has(it.id)?await S.imgCache.get(it.id):await decodeImageFile(it.file||await it.handle.getFile()); if(!src) return null;
+      const s=Math.min(1,220/Math.max(src.width,src.height)); const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(src.width*s)); c.height=Math.max(1,Math.round(src.height*s));
+      const x=c.getContext('2d'); x.imageSmoothingQuality='high'; x.drawImage(src,0,0,c.width,c.height);
+      const tb=await new Promise(r=>c.toBlob(r,'image/webp',0.85)); if(tb) IDB.set('th:'+k,tb); return await createImageBitmap(c);
+    }catch(e){ console.warn(e); return null; } finally{ BV.busy--; const n=BV.queue.shift(); if(n) n(); }
+  })();
+  BV.thumbs.set(k,p); return p;
+}
+function bvSel(){ const n=BV.sel.size; $('#bk-selbar').hidden=!n; $('#bk-seln').textContent=n===1?'1 imagem selecionada':`${n} imagens selecionadas`; }
+
+// ---------- mudanças no banco ----------
+async function bvArchive(file){ // guarda a versão atual em _antigas antes de trocar/excluir
+  try{ const h=await BANK.dir.getFileHandle(file); const old=await h.getFile(); const ad=await BANK.dir.getDirectoryHandle('_antigas',{create:true});
+    const stamp=new Date(old.lastModified||Date.now()).toISOString().slice(0,10); const nm=file.replace(/(\.[^.]+)$/,` (${stamp})$1`);
+    const oh=await ad.getFileHandle(nm,{create:true}); const w=await oh.createWritable(); await w.write(old); await w.close(); return true; }catch(e){ console.warn(e); return false; }
+}
+function bvRemap(oldId,newId){ // a memória dos produtos e as artes abertas passam a usar a imagem nova
+  let ch=false; for(const m of Object.values(MEM)) if(m&&m.imgs){ const i=m.imgs.indexOf(oldId); if(i>=0){ if(newId) m.imgs[i]=newId; else m.imgs.splice(i,1); ch=true; } }
+  if(ch) memSave(MEM);
+  const touched=new Set(); S.grids.forEach((g,gi)=>g.items.forEach(it=>{ const i=(it.imgIds||[]).indexOf(oldId); if(i>=0){ const a=[...it.imgIds]; if(newId) a[i]=newId; else a.splice(i,1); it.imgIds=a; touched.add(gi); } }));
+  S.imgCache.delete(oldId); if(newId) S.imgCache.delete(newId); return touched;
+}
+function bvDropItem(id){ S.lib.items=S.lib.items.filter(x=>x.id!==id); S.lib.byId.delete(id); S.lib.index=buildIndex(S.lib.items); }
+async function bvAfterChange(touched){
+  setStatus('st-lib',`${S.lib.items.length} imagens · ${BANK.name}`,true);
+  try{ await writeBankIndex(); }catch(e){ console.warn(e); }
+  const all=new Set(touched||[]); S.grids.forEach((g,gi)=>{ if(g.items.some(it=>(it.imgIds||[]).some(id=>!S.imgCache.has(id)))) all.add(gi); });
+  for(const gi of all){ buildRows(gi); renderSoon(gi); }
+  bvRender();
+}
+// troca a imagem de um produto (e, se quiser, o nome) — a antiga vai para _antigas
+async function bvReplace(it,blob,newName){
+  const file=bvFile(it); const name=(newName||it.name).trim(); const target=safeFileName(name)+'.png';
+  if(target!==file){ await bvArchive(file); try{ await BANK.dir.removeEntry(file); }catch(e){ console.warn(e); } delete BANK.index[file]; bvDropItem(it.id); }
+  const id=await saveToBank(name,blob,'troca no banco');
+  if(id===it.id){ S.imgCache.delete(id); const t=new Set(); S.grids.forEach((g,gi)=>{ if(g.items.some(x=>(x.imgIds||[]).includes(id))) t.add(gi); }); return t; }
+  return bvRemap(it.id,id);
+}
+async function bvRename(it,newName){
+  newName=newName.trim(); if(!newName||newName===it.name) return;
+  const file=bvFile(it), ext=(file.match(/\.[^.]+$/)||['.png'])[0], nf=safeFileName(newName)+ext;
+  if(nf===file){ BANK.index[file]={...(BANK.index[file]||{file}),name:newName,mod:it.mod}; it.name=newName; S.lib.index=buildIndex(S.lib.items); return bvAfterChange(); }
+  let exists=null; try{ exists=await BANK.dir.getFileHandle(nf); }catch(e){}
+  if(exists&&!confirm(`Já existe uma imagem chamada "${newName}". Substituir ela por esta? (a outra fica guardada em _antigas)`)) return;
+  if(exists) await bvArchive(nf);
+  const data=await it.handle.getFile(); const fh=await BANK.dir.getFileHandle(nf,{create:true}); const w=await fh.createWritable(); await w.write(data); await w.close();
+  try{ await BANK.dir.removeEntry(file); }catch(e){ console.warn(e); }
+  const meta=BANK.index[file]||{}; delete BANK.index[file]; BANK.index[nf]={...meta,name:newName,file:nf,mod:it.mod||Date.now()};
+  const nid='b:'+nf; bvDropItem(it.id); bvDropItem(nid);
+  const ni={id:nid,name:newName,handle:fh,mod:it.mod||Date.now(),src:'banco'}; S.lib.items.push(ni); S.lib.byId.set(nid,ni); S.lib.index=buildIndex(S.lib.items);
+  const t=bvRemap(it.id,nid); toast(`Renomeada para "${newName}".`); await bvAfterChange(t); return ni;
+}
+async function bvDelete(items){
+  items=items.filter(bvEditable); if(!items.length) return false;
+  const drive=BANK.dir instanceof GDir, used=bvUsage(); const nu=items.filter(i=>used.get(i.id)).length;
+  const msg=(items.length===1?`Excluir "${items[0].name}" do banco?`:`Excluir ${items.length} imagens do banco?`)+
+    (nu?`\n\n${nu===1?'Ela já foi usada':nu+' delas já foram usadas'} em ofertas: o app vai procurar outra imagem para esses produtos.`:'')+
+    (drive?'\n\nElas vão para a lixeira do Google Drive (dá para recuperar por 30 dias).':'\n\nNo computador a exclusão é definitiva.');
+  if(!confirm(msg)) return false;
+  const touched=new Set(); let ok=0;
+  for(const it of items){ const f=bvFile(it); try{ await BANK.dir.removeEntry(f); delete BANK.index[f]; bvDropItem(it.id); for(const gi of bvRemap(it.id,null)) touched.add(gi); BV.sel.delete(it.id); ok++; }catch(e){ console.warn(e); toast('Não consegui excluir '+it.name+': '+e.message,'err'); } }
+  for(const gi of touched) for(const it of S.grids[gi].items) if(!it.imgIds.length) autoPickImages(it);
+  toast(ok===1?'Imagem excluída do banco.':`${ok} imagens excluídas do banco.`); await bvAfterChange(touched); return true;
+}
+function bvPickFile(multi){ return new Promise(res=>{ const i=el('input',{type:'file',accept:'image/*,.psd',multiple:multi||false}); i.onchange=()=>res([...i.files]); i.click(); }); }
+// abre a janela de recorte (a mesma das ofertas) e devolve o canvas pronto
+async function bvCutout(blob,name,label){
+  const src=await createImageBitmap(blob).catch(async()=>{ try{ return await decodeImageFile(blob instanceof File?blob:new File([blob],'x')); }catch(e){ return null; } });
+  if(!src){ toast('Não consegui ler essa imagem.','err'); return null; }
+  return new Promise(res0=>{
+    let settled=false; const res=v=>{ if(!settled){ settled=true; res0(v); } };
+    NI={gi:null,it:null,blob,src,out:null,mode:'',bankCb:res}; $('#ni-bri').value=0; $('#ni-con').value=0;
+    $('#ni-name').value=name||''; $('#ni-prod').textContent=label||''; $('#newimg').classList.add('bkmode');
+    drawPreview($('#ni-a'),src,'#fff'); drawPreview($('#ni-b'),null); $('#ni-save').disabled=true; $('#ni-save').textContent='Usar este recorte';
+    const d=$('#newimg'); const done=()=>{ d.removeEventListener('close',done); d.classList.remove('bkmode'); $('#ni-save').textContent='Salvar no banco e usar'; if(NI&&NI.bankCb===res) NI=null; res(null); };
+    d.addEventListener('close',done); d.showModal(); runRemoval('branco');
+  });
+}
+
+// ---------- detalhe de uma imagem ----------
+let BVCUR=null;
+async function bvOpen(it){
+  BVCUR=it; const d=$('#bk-item'); const ed=bvEditable(it); const file=bvFile(it);
+  $('#bki-name').value=it.name; $('#bki-name').disabled=!ed; $('#bki-ren').hidden=!ed; $('#bki-rep').hidden=!ed; $('#bki-del').hidden=!ed;
+  const meta=(file&&BANK.index[file])||{}; const age=bvAge(it.mod); const used=bvUsage().get(it.id)||0;
+  const info=$('#bki-info'); info.innerHTML='';
+  info.append(el('div',{},el('b',{},'Data: '),fmtDate(it.mod)||'sem data',' ',el('span',{class:'bk-age '+age.cls},age.txt)),
+    el('div',{},el('b',{},'Arquivo: '),file||it.id.replace(/^\w+:/,''),it.handle&&it.handle._size?' · '+bvFmtSize(it.handle._size):''),
+    meta.origem?el('div',{},el('b',{},'Origem: '),meta.origem):null,
+    el('div',{},el('b',{},'Uso: '),used?`escolhida para ${used} produto${used>1?'s':''} nas ofertas`:'ainda não usada em nenhuma oferta'));
+  for(const n of [...info.childNodes]) if(n.nodeType===3) n.remove();
+  const vers=$('#bki-vers'); vers.innerHTML='';
+  const sib=S.lib.items.filter(x=>x!==it&&bvKey(x.name)===bvKey(it.name)).sort((a,b)=>(b.mod||0)-(a.mod||0));
+  if(sib.length){ vers.append(el('h4',{},'Outras versões deste produto no banco'));
+    const row=el('div',{class:'bk-vrow'}); for(const s of sib){ const cv=el('canvas',{width:110,height:110,'data-id':s.id}); bvObserve(cv,s);
+      row.append(el('div',{class:'bk-v',onclick:()=>bvOpen(s),title:s.name},cv,el('small',{},s.name),el('small',{class:'bk-age '+bvAge(s.mod).cls},fmtDate(s.mod)||'sem data'),(s.mod||0)>(it.mod||0)?el('small',{class:'bk-tag ok'},'mais nova'):null)); }
+    vers.append(row); }
+  if(ed){ bvOldVersions(file).then(list=>{ if(BVCUR!==it||!list.length) return; vers.append(el('h4',{},'Versões anteriores guardadas (_antigas)'));
+    const row=el('div',{class:'bk-vrow'}); for(const o of list){ const cv=el('canvas',{width:110,height:110});
+      o.h.getFile().then(f=>decodeImageFile(f)).then(c=>bvPaint(cv,c)).catch(()=>{});
+      row.append(el('div',{class:'bk-v'},cv,el('small',{},o.date||o.name),el('button',{class:'lnk',onclick:async()=>{ if(!confirm('Voltar para esta versão? A imagem atual fica guardada em _antigas.')) return; const b=await o.h.getFile(); const t=await bvReplace(it,b); toast('Versão anterior restaurada.'); d.close(); await bvAfterChange(t); }},'restaurar'))); }
+    vers.append(row); }); }
+  const cv=$('#bki-img'); const x=cv.getContext('2d'); x.clearRect(0,0,cv.width,cv.height);
+  d.showModal();
+  const img=await getImage(it.id); if(img&&BVCUR===it) bvPaint(cv,img);
+}
+async function bvOldVersions(file){
+  try{ const ad=await BANK.dir.getDirectoryHandle('_antigas'); if(ad.refresh) ad.refresh(); const base=file.replace(/\.[^.]+$/,''); const out=[];
+    for await (const [n,h] of ad.entries()){ if(h.kind!=='file') continue; const m=n.match(/^(.*) \((\d{4}-\d\d-\d\d)\)\.[^.]+$/); if(m&&m[1]===base) out.push({name:n,h,date:m[2].split('-').reverse().join('/')}); }
+    return out.sort((a,b)=>b.name.localeCompare(a.name)); }catch(e){ return []; }
+}
+async function bvOldSummary(){
+  const box=$('#bk-oldst'); box.textContent='Contando…';
+  try{ const ad=await BANK.dir.getDirectoryHandle('_antigas'); if(ad.refresh) ad.refresh(); let n=0,sz=0; const list=[];
+    for await (const [nm,h] of ad.entries()){ if(h.kind!=='file') continue; n++; let s=h._size; if(s==null){ try{ s=(await h.getFile()).size; }catch(e){ s=0; } } sz+=s||0; list.push(nm); }
+    box.textContent=n?`${n} versões antigas guardadas${sz?' · '+bvFmtSize(sz):''}`:'Nenhuma versão antiga guardada.'; return {ad,list}; }
+  catch(e){ box.textContent='Nenhuma versão antiga guardada.'; return null; }
+}
+async function bvEmptyOld(){
+  const r=await bvOldSummary(); if(!r||!r.list.length) return;
+  const drive=BANK.dir instanceof GDir;
+  if(!confirm(`Apagar as ${r.list.length} versões antigas guardadas na pasta _antigas?`+(drive?'\nElas vão para a lixeira do Google Drive.':'\nNo computador isso é definitivo.'))) return;
+  let ok=0; for(const n of r.list){ try{ await r.ad.removeEntry(n); ok++; }catch(e){ console.warn(e); } }
+  toast(`${ok} versões antigas apagadas.`); bvOldSummary();
+}
+
+// ---------- enviar imagens novas (várias de uma vez) ----------
+function bvGuessName(f){ let n=f.name.replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim();
+  if(/^(img|dsc|whatsapp|image|imagem|foto|photo|screenshot|captura|pxl)\b/i.test(n)||/^[\d\s-]+$/.test(n)) return ''; return fixAccents?fixAccents(n):n; }
+async function bvUpload(files){
+  files=[...files].filter(f=>/^image\//.test(f.type)||/\.(png|jpe?g|webp|psd|heic)$/i.test(f.name)); if(!files.length) return;
+  if(!BANK.dir){ toast('Conecte o banco (pasta do computador ou Google) para enviar imagens.','err'); return; }
+  const d=$('#bk-up'); if(!d.open){ BV.up=[]; $('#bku-list').innerHTML=''; d.showModal(); }
+  for(const f of files){
+    const r={file:f,out:null,name:bvGuessName(f),target:'',el:null}; BV.up.push(r);
+    const cv=el('canvas',{width:120,height:120}); const st=el('span',{class:'st'},'Tirando o fundo branco…');
+    const nm=el('input',{value:r.name,placeholder:'Nome do produto (como vai aparecer na busca)'});
+    const sel=el('select',{}); const sugg=el('div',{class:'bku-sug'});
+    const fill=()=>{ const q=nm.value.trim(); const cur=sel.value; sel.innerHTML=''; sel.append(el('option',{value:''},'➕ Imagem nova no banco'));
+      const res=q?search(S.lib.index,q,6).filter(x=>x.score>0.3):[]; for(const x of res) sel.append(el('option',{value:x.item.id},`🔁 Substituir: ${x.item.name} (${fmtDate(x.item.mod)||'sem data'})`));
+      if(cur&&!res.some(x=>x.item.id===cur)&&S.lib.byId.get(cur)) sel.append(el('option',{value:cur},`🔁 Substituir: ${S.lib.byId.get(cur).name}`));
+      sel.value=cur&&[...sel.options].some(o=>o.value===cur)?cur:''; r.target=sel.value; showT(); };
+    const showT=()=>{ sugg.innerHTML=''; const t=S.lib.byId.get(r.target); if(!t) return; const tc=el('canvas',{width:70,height:70,'data-id':t.id}); bvObserve(tc,t); sugg.append(el('span',{class:'st'},'sai esta →'),tc); };
+    let tm=0; nm.oninput=()=>{ r.name=nm.value; clearTimeout(tm); tm=setTimeout(fill,250); };
+    sel.onchange=()=>{ r.target=sel.value; const t=S.lib.byId.get(r.target); if(t&&!nm.value.trim()){ nm.value=t.name; r.name=t.name; } showT(); };
+    const cut=el('button',{class:'btn',onclick:async()=>{ const c=await bvCutout(f,nm.value,nm.value||f.name); if(c){ r.out=c; drawPreview(cv,c,null); st.textContent='Recorte ajustado.'; } }},'Ajustar recorte…');
+    const rm=el('button',{class:'lnk',title:'Tirar da lista',onclick:()=>{ BV.up=BV.up.filter(x=>x!==r); row.remove(); }},'✕');
+    const row=el('div',{class:'bku-row'},el('div',{class:'bku-th'},cv),el('div',{class:'bku-f'},nm,sel,el('div',{class:'bku-a'},cut,st,sugg)),rm);
+    r.el=row; $('#bku-list').append(row); fill();
+    (async()=>{ try{ const src=await createImageBitmap(f).catch(()=>decodeImageFile(f)); r.out=trimCanvas(removeWhiteBg(src),1200); drawPreview(cv,r.out,null); st.textContent='Fundo branco removido. Se precisar, ajuste o recorte.'; }
+      catch(e){ st.textContent='Não consegui ler este arquivo.'; } })();
+  }
+}
+async function bvUploadSave(){
+  const rows=BV.up.filter(r=>r.out); if(!rows.length){ toast('Nada para salvar ainda.','err'); return; }
+  const miss=rows.find(r=>!r.name.trim()&&!r.target); if(miss){ toast('Dê um nome para cada imagem (é por ele que o app encontra o produto).','err'); miss.el.querySelector('input').focus(); return; }
+  const btn=$('#bku-save'); btn.disabled=true; const touched=new Set(); let nNew=0,nRep=0;
+  try{ for(const r of rows){ btn.textContent=`Salvando ${nNew+nRep+1} de ${rows.length}…`;
+      const blob=await new Promise(res=>r.out.toBlob(res,'image/png'));
+      const t=S.lib.byId.get(r.target);
+      if(t&&bvEditable(t)){ for(const gi of await bvReplace(t,blob,r.name.trim()||t.name)) touched.add(gi); nRep++; }
+      else { await saveToBank(r.name.trim(),blob,'enviada no banco'); nNew++; }
+      BV.up=BV.up.filter(x=>x!==r); r.el.remove(); }
+    toast([nNew?`${nNew} nova${nNew>1?'s':''}`:'',nRep?`${nRep} substituída${nRep>1?'s':''}`:''].filter(Boolean).join(' e ')+' no banco.');
+    if(!BV.up.length) $('#bk-up').close();
+    // produtos das ofertas abertas que ainda estão sem imagem tentam achar a nova
+    for(const g of S.grids) for(const it of g.items) if(!it.imgIds.length) autoPickImages(it);
+    await bvAfterChange(touched);
+  }catch(e){ console.error(e); toast('Erro ao salvar: '+e.message,'err'); }
+  finally{ btn.disabled=false; btn.textContent='Salvar no banco'; }
+}
+
+function bvInit(){
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>bvShow(b.dataset.tab==='bank'));
+  let tm=0; $('#bk-q').oninput=e=>{ clearTimeout(tm); tm=setTimeout(()=>{ BV.q=e.target.value; BV.shown=120; if(BV.q&&BV.sort!=='rel'&&!BV._sortTouched) { BV.sort='rel'; $('#bk-sort').value='rel'; } bvRender(); },200); };
+  $('#bk-filter').onchange=e=>{ BV.filter=e.target.value; BV.shown=120; bvRender(); };
+  $('#bk-sort').onchange=e=>{ BV.sort=e.target.value; BV._sortTouched=true; bvRender(); };
+  $('#bk-upbtn').onclick=async()=>bvUpload(await bvPickFile(true));
+  $('#bk-connect').onclick=reopenBank; $('#bk-connect2').onclick=connectBank; $('#bk-google').onclick=()=>$('#btn-google').click();
+  $('#bk-selall').onclick=()=>{ for(const x of bvList().slice(0,BV.shown)) if(bvEditable(x.it)) BV.sel.add(x.it.id); bvRender(); };
+  $('#bk-selnone').onclick=()=>{ BV.sel.clear(); bvRender(); };
+  $('#bk-seldel').onclick=()=>bvDelete([...BV.sel].map(id=>S.lib.byId.get(id)).filter(Boolean));
+  $('#bk-old').ontoggle=e=>{ if(e.target.open) bvOldSummary(); };
+  $('#bk-oldclr').onclick=bvEmptyOld;
+  $('#bki-close').onclick=()=>$('#bk-item').close();
+  $('#bk-item').addEventListener('close',()=>{ BVCUR=null; });
+  $('#bki-ren').onclick=async()=>{ if(!BVCUR) return; const ni=await bvRename(BVCUR,$('#bki-name').value); if(ni) bvOpen(ni); };
+  $('#bki-name').onkeydown=e=>{ if(e.key==='Enter') $('#bki-ren').click(); };
+  $('#bki-rep').onclick=async()=>{ const it=BVCUR; if(!it) return; const [f]=await bvPickFile(false); if(!f) return; $('#bk-item').close();
+    const c=await bvCutout(f,it.name,'Substituir: '+it.name); if(!c) return; const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+    try{ const t=await bvReplace(it,blob,it.name); toast(`Imagem de "${it.name}" trocada. A antiga ficou em _antigas.`); await bvAfterChange(t); }catch(e){ toast('Erro: '+e.message,'err'); } };
+  $('#bki-del').onclick=async()=>{ if(BVCUR&&await bvDelete([BVCUR])) $('#bk-item').close(); };
+  $('#bku-add').onclick=async()=>bvUpload(await bvPickFile(true));
+  $('#bku-cancel').onclick=()=>{ BV.up=[]; $('#bk-up').close(); };
+  $('#bku-save').onclick=bvUploadSave;
+  const dz=$('#bankview'); dz.addEventListener('dragover',e=>{ if(BANK.dir){ e.preventDefault(); e.stopPropagation(); dz.classList.add('drop'); } });
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drop'));
+  dz.addEventListener('drop',e=>{ if(!BANK.dir) return; e.preventDefault(); e.stopPropagation(); dz.classList.remove('drop'); bvUpload(e.dataTransfer.files); });
+  const bu=$('#bk-up'); bu.addEventListener('dragover',e=>{ e.preventDefault(); e.stopPropagation(); }); bu.addEventListener('drop',e=>{ e.preventDefault(); e.stopPropagation(); bvUpload(e.dataTransfer.files); });
 }
 
 // ---------- Google Drive pela conta Google (funciona em qualquer navegador e no celular) ----------
@@ -2429,7 +2797,7 @@ class GDir{
   refresh(){ this._c=null; }
 }
 class GFile{
-  constructor(f,dir){ this.kind='file'; this.name=f.name; this.id=f.id||null; this.dir=dir; this._mod=f.modifiedTime?Date.parse(f.modifiedTime):0; }
+  constructor(f,dir){ this.kind='file'; this.name=f.name; this.id=f.id||null; this.dir=dir; this._mod=f.modifiedTime?Date.parse(f.modifiedTime):0; this._size=+f.size||0; }
   async getFile(){ if(!this.id) throw new DOMException(this.name+' não encontrado','NotFoundError');
     const b=await (await gdFetch(`${GAPI}/${this.id}?alt=media`)).blob(); return new File([b],this.name,{lastModified:this._mod||Date.now(),type:b.type}); }
   async createWritable(){ const parts=[], self=this;
@@ -3463,7 +3831,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   $('#ni-sharp').onchange=()=>NI&&runRemoval(NI.mode);
   for(const id of ['ni-bri','ni-con']) $('#'+id).oninput=()=>{ cancelAnimationFrame(applyBC.r); applyBC.r=requestAnimationFrame(applyBC); };
   $('#ni-bcr').onclick=()=>{ $('#ni-bri').value=0; $('#ni-con').value=0; applyBC(); };
-  $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
+  bvInit(); $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
   $('#file-lib2').onchange=e=>addLibraryFromFiles(e.target.files);
   for(const id of ['in-cities','in-from','in-to']) $('#'+id).addEventListener('input',()=>{ if(id!=='in-cities') autoBand();
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
