@@ -5,10 +5,29 @@
   "fps": 30,
   "w": 1080,
   "h": 1920,
-  "intro": { "src": "intro.mp4", "dur": 6.625 },
-  "fundo": { "src": "fundo.mp4", "dur": 7.0333 },
-  "assina": { "src": "assina.mp4", "dur": 8.2083 },
-  "transicao": { "frames": 24, "pasta": "tr", "cobre": 10 },
+  "intro": {
+    "src": "intro.mp4",
+    "dur": 6.625,
+    "audio": "intro.mp3",
+    "musicaDesde": 58.2285
+  },
+  "fundo": {
+    "src": "fundo.mp4",
+    "dur": 7.0333
+  },
+  "assina": {
+    "src": "assina.mp4",
+    "dur": 8.2083,
+    "audio": "assina.mp3"
+  },
+  "transicao": {
+    "frames": 20,
+    "fps": 24,
+    "pasta": "tr",
+    "cobre": 8,
+    "audio": "transicao.mp3",
+    "audioDesloc": -0.1667
+  },
   "trilha": {
     "src": "trilha.mp3",
     "inicio": 58.2,
@@ -16,19 +35,39 @@
     "finalCompasso": 95.995,
     "para": 100.0,
     "loopDe": 58.281,
-    "fimArquivo": 106.05
+    "fimArquivo": 106.05,
+    "ganho": 0.14
   },
-  "voz": { "nome": "Leonardo Hamaral", "stability": 0.61, "similarity_boost": 0.51, "style": 0, "speed": 1.0 },
+  "voz": {
+    "nome": "Leonardo Hamaral",
+    "stability": 0.61,
+    "similarity_boost": 0.51,
+    "style": 0,
+    "speed": 1.0,
+    "nivel": 0.25
+  },
   "textos": {
     "intro": "Ofertas especiais na Operação Detona Preço no Proner!",
     "fim": "Vem pro Proner! É nesta sexta e sábado! Operação Detona Preço!",
     "oferta": "{nome}, apenas {preco}{unidade}{clube}!",
     "falaUnidade": false
   },
-  "tempos": { "introVoz": 0.4, "ofertaVoz": 0.25, "ofertaMin": 2.6, "ofertaFolga": 0.35, "assinaVoz": 0.6, "fimFolga": 0.25 },
+  "tempos": {
+    "introVoz": 0.4,
+    "ofertaVoz": 0.25,
+    "ofertaMin": 2.6,
+    "ofertaFolga": 0.35,
+    "assinaVoz": 0.6,
+    "fimFolga": 0.25
+  },
   "tag": "noclube.png",
   "validade": {
     "linha1": "OFERTAS VÁLIDAS PARA {datas} OU ENQUANTO DURAREM OS ESTOQUES",
     "linha2": "*IMAGENS MERAMENTE ILUSTRATIVAS"
+  },
+  "precoPulo": {
+    "escala": 0.22,
+    "dur": 1.25,
+    "antes": 0.1
   }
 }

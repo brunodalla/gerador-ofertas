@@ -104,13 +104,35 @@ function isoDate(s){
   if(!m[3]&&+m[2]<now.getMonth()+1-6) y++;
   return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
 }
+// escolher só os produtos que o cliente pediu (na ordem dos cliques = ordem no vídeo)
+function pickProducts(h){
+  return new Promise(res=>{
+    const d=$('#dlg-pick'), box=$('#pick-list'), sel=[];
+    $('#pick-title').textContent=`Escolha os produtos do vídeo (${h.items.length} no trabalho "${h.title||'Gerador de Ofertas'}")`;
+    box.innerHTML='';
+    const btnOk=$('#pick-ok');
+    const upd=()=>{ box.querySelectorAll('.pk').forEach(c=>{ const i=sel.indexOf(+c.dataset.i); c.classList.toggle('on',i>=0); c.querySelector('.num').textContent=i>=0?i+1:''; }); btnOk.textContent=`Usar ${sel.length} produto${sel.length===1?'':'s'}`; btnOk.disabled=!sel.length; };
+    h.items.forEach((x,i)=>{
+      const club=x.club!=null&&x.club!==''; const v=E.parseMoney(club?x.club:x.price);
+      const th=el('div',{class:'pth'}); if(x.img) th.style.backgroundImage=`url(${URL.createObjectURL(x.img)})`;
+      box.append(el('div',{class:'pk','data-i':i,onclick:()=>{ const k=sel.indexOf(i); if(k>=0) sel.splice(k,1); else sel.push(i); upd(); }},
+        el('span',{class:'num'}),th,el('div',{class:'pn'},x.name),el('div',{class:'pp'},v!=null?E.precoTela(v)+(club?' clube':'')+(/KG/i.test(x.unit||'')?' kg':''):'')));
+    });
+    const done=v=>{ d.close(); btnOk.onclick=$('#pick-all').onclick=$('#pick-cancel').onclick=null; res(v); };
+    btnOk.onclick=()=>done(sel.map(i=>h.items[i]));
+    $('#pick-all').onclick=()=>done(h.items.slice());
+    $('#pick-cancel').onclick=()=>done(null);
+    d.oncancel=()=>res(null);
+    upd(); d.showModal();
+  });
+}
 async function fromGenerator(){
   const h=await IDB.get('video:handoff');
   if(!h||!h.items||!h.items.length){ toast('Nada para trazer. No Gerador de Ofertas, abra o trabalho e toque em "Gerar vídeo deste trabalho".','err'); return; }
-  const keep=V.job.items.length&&!confirm(`Trazer ${h.items.length} produtos de "${h.title||'Gerador de Ofertas'}"? Os produtos que estão aqui agora saem da lista.`);
-  if(keep) return;
+  const chosen=await pickProducts(h);
+  if(!chosen) return;
   const money=v=>{ const n=E.parseMoney(v); return n==null?'':n.toFixed(2).replace('.',','); };
-  V.job.items=h.items.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,on:true}));
+  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,on:true}));
   if(h.from) V.job.from=isoDate(h.from); if(h.to) V.job.to=isoDate(h.to)||V.job.from;
   if(!V.job.title&&h.title) V.job.title=h.title;
   V.job.val=E.datasTexto(V.job.from,V.job.to)||V.job.val;
@@ -153,7 +175,8 @@ async function elConnect(){
 async function tts(text,{seed}={}){
   const c=cfg(); if(!c.voiceId) throw new Error('Escolha a voz em "ElevenLabs…".');
   const body={text,model_id:c.modelId,voice_settings:voiceSettings()}; if(seed!=null) body.seed=seed;
-  const go=b=>elFetch(`/v1/text-to-speech/${c.voiceId}?output_format=mp3_44100_128`,{method:'POST',body:JSON.stringify(b)});
+  // com marcação de tempo de cada letra: serve para saber quando o locutor fala o preço
+  const go=b=>elFetch(`/v1/text-to-speech/${c.voiceId}/with-timestamps?output_format=mp3_44100_128`,{method:'POST',body:JSON.stringify(b)});
   let r;
   try{ r=await go(body); }
   catch(e){
@@ -161,22 +184,38 @@ async function tts(text,{seed}={}){
     if(e.status===400||e.status===422){ const b2={...body,voice_settings:{stability:[0,0.5,1].reduce((a,x)=>Math.abs(x-body.voice_settings.stability)<Math.abs(a-body.voice_settings.stability)?x:a,0.5),similarity_boost:body.voice_settings.similarity_boost}}; r=await go(b2); }
     else throw e;
   }
-  return await r.arrayBuffer();
+  const j=await r.json();
+  const bin=atob(j.audio_base64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return {ab:u.buffer,al:j.alignment||null};
 }
 
 // ---------- locução (trechos) ----------
+const introVideo=()=>!!V.model.intro.audio&&V.job.introVideo!==false;
+const fimVideo=()=>!!V.model.assina.audio&&V.job.fimVideo!==false;
 function segList(){
   const its=V.job.items.filter(i=>i.on!==false);
-  return [{key:'intro',label:'Abertura',text:V.job.intro.trim()},...its.map((it,i)=>({key:'o:'+it.id,label:`Oferta ${i+1}`,text:E.fraseOferta({...it,falado:itemFalado(it)},V.model)})),{key:'fim',label:'Final',text:V.job.fim.trim()}].filter(s=>s.text);
+  return [introVideo()?null:{key:'intro',label:'Abertura',text:V.job.intro.trim()},
+    ...its.map((it,i)=>{ const club=it.club!=null&&it.club!==''; const v=E.parseMoney(club?it.club:it.price); return {key:'o:'+it.id,label:`Oferta ${i+1}`,text:E.fraseOferta({...it,falado:itemFalado(it)},V.model),preco:v!=null?E.precoFalado(v):null}; }),
+    fimVideo()?null:{key:'fim',label:'Final',text:V.job.fim.trim()}].filter(s=>s&&s.text);
+}
+// em que segundo da fala começa o preço (pela marcação do ElevenLabs; sem ela, estimativa pela posição no texto)
+function precoTempo(s,rec){
+  if(!s.preco) return null;
+  let idx=s.text.indexOf(s.preco); if(idx<0){ const m=/\d/.exec(s.text.slice(Math.max(0,s.text.length-40))); idx=m?s.text.length-40+m.index:-1; } if(idx<0) return null;
+  const al=rec.al;
+  if(al&&al.character_start_times_seconds&&al.character_start_times_seconds[idx]!=null) return Math.max(0,al.character_start_times_seconds[idx]-rec.offset);
+  return rec.buf.duration*idx/s.text.length;
 }
 async function segHash(s){ const c=cfg(); return sha([c.voiceId,c.modelId,JSON.stringify(voiceSettings()),s.text].join('|')); }
 async function segAudio(s,{create=false,fresh=false}={}){
   const h=await segHash(s); const k='tts:'+h;
   const cur=V.seg.get(s.key); if(!fresh&&cur&&cur.hash===h&&cur.buf) return cur.buf;
-  let ab=fresh?null:await IDB.get(k);
-  if(!ab){ if(!create) return null; ab=await tts(s.text,{seed:fresh?Math.floor(Math.random()*4e9):undefined}); await IDB.set(k,ab); }
-  const buf=E.trimSilence(await E.decodeAudio(ab));
-  V.seg.set(s.key,{hash:h,buf}); return buf;
+  let rec=fresh?null:await IDB.get(k);
+  if(rec instanceof ArrayBuffer) rec={ab:rec,al:null};
+  if(!rec){ if(!create) return null; rec=await tts(s.text,{seed:fresh?Math.floor(Math.random()*4e9):undefined}); await IDB.set(k,rec); }
+  const tr=E.trimSilence(await E.decodeAudio(rec.ab));
+  const r={hash:h,buf:tr.buf,offset:tr.offset,al:rec.al}; r.preco=precoTempo(s,r);
+  V.seg.set(s.key,r); return tr.buf;
 }
 let PLAYING=null;
 function play(buf){ if(PLAYING){ try{ PLAYING.stop(); }catch(e){} } const ac=new AudioContext(); const s=ac.createBufferSource(); s.buffer=buf; s.connect(ac.destination); s.start(); PLAYING=s; }
@@ -210,9 +249,8 @@ async function genAll(){
 async function currentTimeline(){
   const items=V.job.items.filter(i=>i.on!==false);
   const list=segList(); const by=new Map(); for(const s of list) by.set(s.key,await segAudio(s));
-  const voices={intro:by.get('intro')||null,fim:by.get('fim')||null,ofertas:items.map(it=>by.get('o:'+it.id)||null)};
-  const A=V.A;
-  const tl=E.buildTimeline(V.model,items,voices,A?A.music:true);
+  const voices={intro:by.get('intro')||null,fim:by.get('fim')||null,ofertas:items.map(it=>{ const b=by.get('o:'+it.id); return b?{buf:b,preco:V.seg.get('o:'+it.id)?.preco??null}:null; })};
+  const tl=E.buildTimeline(V.model,items,voices,true,{introVideo:introVideo(),fimVideo:fimVideo()});
   return {tl,items,voices,missing:list.filter(s=>!by.get(s.key)).length};
 }
 async function updTimeline(){
@@ -245,7 +283,7 @@ async function render(){
     const A=await assets();
     const {tl,items}=await currentTimeline(); const imgs=await imgsFor(items); E.resetLayouts(items);
     st('st-render','Mixando o áudio…');
-    const audio=await E.mixAudio(tl,A.music,{musicDb:+$('#in-mdb').value});
+    const audio=await E.mixAudio(tl,A,V.model,{musicDb:+$('#in-mdb').value});
     st('st-render','Gerando o vídeo…');
     const blob=await E.renderMp4({tl,model:V.model,A,imgs,datas:V.job.val,audio,signal:ABORT.signal,onProgress:(p,s)=>{ $('#prog').style.width=(p*100).toFixed(1)+'%'; st('st-render',`Gerando o vídeo… ${Math.round(p*100)}% · ${Math.round(s)} s`); }});
     V.lastBlob=blob;
@@ -263,7 +301,9 @@ async function render(){
 }
 
 // ---------- trabalhos ----------
-function fillJobFields(){ $('#in-title').value=V.job.title||''; $('#in-from').value=V.job.from||''; $('#in-to').value=V.job.to||''; $('#in-val').value=V.job.val||''; $('#in-intro').value=V.job.intro||''; $('#in-fim').value=V.job.fim||''; }
+function fillJobFields(){ $('#in-title').value=V.job.title||''; $('#in-from').value=V.job.from||''; $('#in-to').value=V.job.to||''; $('#in-val').value=V.job.val||''; $('#in-intro').value=V.job.intro||''; $('#in-fim').value=V.job.fim||'';
+  for(const [ck,lb,on,has] of [['#ck-intro','#lb-intro',introVideo(),!!V.model.intro.audio],['#ck-fim','#lb-fim',fimVideo(),!!V.model.assina.audio]]){ $(ck).checked=on; $(ck).disabled=!has; $(ck).parentElement.hidden=!has; $(lb).hidden=on; }
+}
 async function openJobs(){
   const box=$('#jobs-list'); box.innerHTML='Carregando…'; $('#dlg-jobs').showModal();
   const keys=await IDB.keys('vjob:'); const jobs=[]; for(const k of keys){ const j=await IDB.get(k); if(j) jobs.push(j); }
@@ -294,11 +334,13 @@ async function init(){
   $('#in-intro').onchange=e=>{ V.job.intro=e.target.value; setCfg({intro:V.job.intro}); saveJob(); renderSegs(); };
   $('#in-fim').onchange=e=>{ V.job.fim=e.target.value; setCfg({fim:V.job.fim}); saveJob(); renderSegs(); };
   $('#btn-from-gen').onclick=fromGenerator;
+  $('#ck-intro').onchange=e=>{ V.job.introVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
+  $('#ck-fim').onchange=e=>{ V.job.fimVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
   $('#btn-add').onclick=()=>{ V.job.items.push({id:newId(),name:'PRODUTO',tela:'PRODUTO',price:'',club:'',unit:'UND',img:null,on:true}); saveJob(); renderItems(); renderSegs(); };
   $('#btn-tts').onclick=genAll;
   $('#btn-thumbs').onclick=thumbs;
   $('#btn-render').onclick=render;
-  $('#in-mdb').value=cfg().mdb||'10'; $('#in-mdb').onchange=e=>setCfg({mdb:e.target.value});
+  $('#in-mdb').value=cfg().mdbv||'0'; $('#in-mdb').onchange=e=>setCfg({mdbv:e.target.value}); 
   $('#btn-jobs').onclick=openJobs;
   $('#btn-el').onclick=()=>{ $('#el-key').value=elKey(); $('#dlg-el').showModal(); if(elKey()) elConnect(); };
   $('#el-load').onclick=elConnect; $('#el-close').onclick=()=>{ $('#dlg-el').close(); renderSegs(); };

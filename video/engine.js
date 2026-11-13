@@ -59,7 +59,7 @@ export function datasTexto(from,to){
 let ACTX=null;
 function actx(){ if(!ACTX) ACTX=new (window.AudioContext||window.webkitAudioContext)({sampleRate:SR}); return ACTX; }
 export async function decodeAudio(arrayBuffer){ return await actx().decodeAudioData(arrayBuffer.slice(0)); }
-// corta o silêncio do começo e do fim da locução (deixa uma folga curta)
+// corta o silêncio do começo e do fim da locução (deixa uma folga curta); devolve também quanto cortou do começo
 export function trimSilence(buf,thr=0.012,pad=0.04){
   const n=buf.length, ch=[...Array(buf.numberOfChannels)].map((_,i)=>buf.getChannelData(i));
   const loud=i=>ch.some(c=>Math.abs(c[i])>thr);
@@ -67,7 +67,7 @@ export function trimSilence(buf,thr=0.012,pad=0.04){
   a=Math.max(0,a-Math.round(pad*buf.sampleRate)); b=Math.min(n-1,b+Math.round(pad*1.5*buf.sampleRate));
   const out=new AudioBuffer({length:Math.max(1,b-a+1),numberOfChannels:buf.numberOfChannels,sampleRate:buf.sampleRate});
   for(let i=0;i<buf.numberOfChannels;i++) out.copyToChannel(ch[i].subarray(a,b+1),i);
-  return out;
+  return {buf:out,offset:a/buf.sampleRate};
 }
 function rms(buf,from=0,to=buf.duration,thr=0.01){
   const c=buf.getChannelData(0), a=Math.floor(from*buf.sampleRate), b=Math.min(c.length,Math.floor(to*buf.sampleRate));
@@ -75,34 +75,39 @@ function rms(buf,from=0,to=buf.duration,thr=0.01){
 }
 
 // ---------------- linha do tempo ----------------
-// segs: {intro:AudioBuffer, ofertas:[AudioBuffer], fim:AudioBuffer}
-export function buildTimeline(model,items,voices,music){
-  const tm=model.tempos, tr=model.transicao, fps=model.fps;
+// voices: {intro, fim, ofertas:[{buf, preco}]} (preco = segundos, dentro da fala, em que o preço começa)
+// opts.introVideo / opts.fimVideo: usar o áudio que já vem no vídeo da intro / assinatura (locução, trilha e efeitos)
+export function buildTimeline(model,items,voices,music,opts={}){
+  const tm=model.tempos, tr=model.transicao, fps=model.fps, trFps=tr.fps||fps;
   const snap=t=>Math.round(t*fps)/fps;
+  const introVideo=!!(opts.introVideo&&model.intro.audio), fimVideo=!!(opts.fimVideo&&model.assina.audio);
   const parts=[]; let t=0;
-  // abertura: o vídeo da intro inteiro; se a fala for mais longa, a intro segura o último quadro
-  const vi=voices.intro;
+  // abertura: o vídeo da intro inteiro; com locução gerada mais longa, a intro segura o último quadro
+  const vi=introVideo?null:voices.intro;
   let introEnd=model.intro.dur;
   if(vi) introEnd=Math.max(introEnd, tm.introVoz+vi.duration+0.25);
-  parts.push({type:'intro',start:0,end:snap(introEnd),voice:vi?{buf:vi,at:tm.introVoz}:null});
+  parts.push({type:'intro',start:0,end:snap(introEnd),voice:vi?{buf:vi,at:tm.introVoz}:null,clip:introVideo?'intro':null});
   t=snap(introEnd);
   items.forEach((it,i)=>{
     const v=voices.ofertas[i];
-    const d=Math.max(tm.ofertaMin,(v?v.duration:0)+tm.ofertaVoz+tm.ofertaFolga);
-    parts.push({type:'oferta',item:it,idx:i,start:t,end:snap(t+d),voice:v?{buf:v,at:t+tm.ofertaVoz}:null});
+    const d=Math.max(tm.ofertaMin,(v?v.buf.duration:0)+tm.ofertaVoz+tm.ofertaFolga);
+    parts.push({type:'oferta',item:it,idx:i,start:t,end:snap(t+d),voice:v?{buf:v.buf,at:t+tm.ofertaVoz,preco:v.preco}:null});
     t=snap(t+d);
   });
-  const vf=voices.fim;
+  const vf=fimVideo?null:voices.fim;
   let aEnd=t+model.assina.dur;
   if(vf) aEnd=Math.max(aEnd,t+tm.assinaVoz+vf.duration+0.6);
-  parts.push({type:'assina',start:t,end:snap(aEnd),voice:vf?{buf:vf,at:t+tm.assinaVoz}:null});
+  parts.push({type:'assina',start:t,end:snap(aEnd),voice:vf?{buf:vf,at:t+tm.assinaVoz}:null,clip:fimVideo?'assina':null});
   let T=snap(aEnd);
-  // trilha: o final da música cai no fim do vídeo; a sobra (menos de um compasso) vira tempo a mais nas ofertas
+  // trilha: depois da intro com áudio próprio ela continua do ponto em que a intro parou (mesma música, sem corte);
+  // o final da música cai no fim do vídeo; a sobra (menos de um compasso) vira tempo a mais nas ofertas
+  const mStart=introVideo?parts[0].end:0;
+  const songStart=introVideo?(model.intro.musicaDesde+parts[0].end):model.trilha.inicio;
   let mus=null;
   if(music){
-    mus=planMusic(model.trilha,T-tm.fimFolga);
+    mus=planMusic(model.trilha,songStart,T-tm.fimFolga-mStart,mStart);
     if(mus.extra>0.001){
-      const offers=parts.filter(p=>p.type==='oferta'); const n=offers.length||1;
+      const n=parts.filter(p=>p.type==='oferta').length||1;
       let shift=0;
       for(const p of parts){
         p.start=snap(p.start+shift); if(p.voice&&p.type!=='intro') p.voice.at+=shift;
@@ -110,63 +115,75 @@ export function buildTimeline(model,items,voices,music){
         p.end=snap(p.end+shift);
       }
       T=parts[parts.length-1].end;
-      mus=planMusic(model.trilha,T-tm.fimFolga);
+      mus=planMusic(model.trilha,songStart,T-tm.fimFolga-mStart,mStart);
     }
   }
+  // preço: momento (no tempo do vídeo) em que o locutor fala o preço
+  for(const p of parts) if(p.type==='oferta'&&p.voice&&p.voice.preco!=null) p.precoAt=p.voice.at+p.voice.preco;
   // transições: o quadro que cobre a tela cai exatamente no corte entre dois trechos
-  const trans=[]; for(let i=1;i<parts.length;i++) trans.push({cut:parts[i].start,start:parts[i].start-tr.cobre/fps});
-  return {parts,T,trans,music:mus,frames:Math.round(T*fps)};
+  const trans=[]; for(let i=1;i<parts.length;i++){ const st=parts[i].start-tr.cobre/trFps; trans.push({cut:parts[i].start,start:st,audioAt:st+(tr.audioDesloc||0)}); }
+  return {parts,T,trans,music:mus,frames:Math.round(T*fps),introVideo,fimVideo};
 }
 // pedaços da música (tempo da música → tempo do vídeo), cortes sempre no início de compasso
-export function planMusic(m,stopAt){
+export function planMusic(m,songStart,length,offset=0){
   const bar=4*60/m.bpm, tail=m.para-m.finalCompasso;
-  const Lb=Math.max(bar,stopAt-tail);
+  const Lb=Math.max(bar,length-tail);
   const pieces=[]; let bodyLen;
-  const natural=m.finalCompasso-m.inicio;
+  const natural=m.finalCompasso-songStart;
   if(Lb<=natural){
     const k=Math.floor((natural-Lb)/bar+1e-6); const end=m.finalCompasso-k*bar;
-    pieces.push({from:m.inicio,to:end,at:0}); bodyLen=end-m.inicio;
+    pieces.push({from:songStart,to:end,at:offset}); bodyLen=end-songStart;
   } else {
-    pieces.push({from:m.inicio,to:m.finalCompasso,at:0}); let at=natural, rem=Lb-natural; const loop=m.finalCompasso-m.loopDe;
-    while(rem>loop+1e-6){ pieces.push({from:m.loopDe,to:m.finalCompasso,at}); at+=loop; rem-=loop; }
+    pieces.push({from:songStart,to:m.finalCompasso,at:offset}); let at=natural, rem=Lb-natural; const loop=m.finalCompasso-m.loopDe;
+    while(rem>loop+1e-6){ pieces.push({from:m.loopDe,to:m.finalCompasso,at:offset+at}); at+=loop; rem-=loop; }
     const k=Math.floor((loop-rem)/bar+1e-6); const end=m.finalCompasso-k*bar;
-    pieces.push({from:m.loopDe,to:end,at}); bodyLen=at+(end-m.loopDe);
+    pieces.push({from:m.loopDe,to:end,at:offset+at}); bodyLen=at+(end-m.loopDe);
   }
-  pieces.push({from:m.finalCompasso,to:m.fimArquivo,at:bodyLen,ending:true});
-  return {pieces,extra:bodyLen-Lb,stopAt:bodyLen+tail};
+  pieces.push({from:m.finalCompasso,to:m.fimArquivo,at:offset+bodyLen,ending:true});
+  return {pieces,extra:bodyLen-Lb,stopAt:offset+bodyLen+tail};
 }
 
-// mistura locução + trilha num AudioBuffer estéreo do tamanho do vídeo
-export async function mixAudio(tl,musicBuf,{musicDb=10,riseDb=4}={}){
+// mistura: áudio da intro/assinatura/transições + locução + trilha, num AudioBuffer estéreo do tamanho do vídeo
+// trilha no mesmo volume em que ela toca dentro da intro (model.trilha.ganho); locução no nível da voz da intro (model.voz.nivel)
+export async function mixAudio(tl,A,model,{musicDb=0}={}){
   const T=tl.T, len=Math.ceil(T*SR);
   const oc=new OfflineAudioContext(2,len,SR);
+  // limitador no fim: segura só os picos (transição por cima da intro, etc.) sem baixar o resto
+  const lim=oc.createDynamicsCompressor(); lim.threshold.value=-2; lim.knee.value=0; lim.ratio.value=20; lim.attack.value=0.002; lim.release.value=0.08;
+  lim.connect(oc.destination);
+  const OUT=lim;
   const voices=tl.parts.filter(p=>p.voice).map(p=>p.voice);
-  // nível: trilha N dB abaixo da média da voz
   let vr=0,vn=0; for(const v of voices){ const r=rms(v.buf); if(r){ vr+=r*r; vn++; } } vr=vn?Math.sqrt(vr/vn):0.1;
-  if(musicBuf){
-    const p0=tl.music.pieces[0]; const mr=rms(musicBuf,p0.from,p0.to,0.001)||0.1;
-    const g=(vr/mr)*Math.pow(10,-musicDb/20);
-    const lastVoiceEnd=Math.max(0,...voices.map(v=>v.at+v.buf.duration));
-    const master=oc.createGain(); master.connect(oc.destination);
-    master.gain.setValueAtTime(g,0);
-    let gEnd=g;
-    if(riseDb&&lastVoiceEnd<T-0.9){ gEnd=g*Math.pow(10,riseDb/20); master.gain.setValueAtTime(g,lastVoiceEnd+0.05); master.gain.linearRampToValueAtTime(gEnd,lastVoiceEnd+0.6); }
-    master.gain.setValueAtTime(gEnd,T-0.25); master.gain.linearRampToValueAtTime(0,T);
+  const vg=(model.voz.nivel||0.25)/vr;
+  const play=(buf,at,gain=1,dest=OUT)=>{ if(!buf) return; const s=oc.createBufferSource(); s.buffer=buf; const g=oc.createGain(); g.gain.value=gain; s.connect(g); g.connect(dest); const off=Math.max(0,-at); s.start(Math.max(0,at),off); };
+  if(A.music&&tl.music){
+    const g=(model.trilha.ganho||0.14)*Math.pow(10,musicDb/20);
+    const master=oc.createGain(); master.connect(OUT);
+    master.gain.setValueAtTime(g,0); master.gain.setValueAtTime(g,T-0.3); master.gain.linearRampToValueAtTime(0,T);
     const X=0.012;
     tl.music.pieces.forEach((p,i)=>{
       const dur=Math.min(p.to-p.from,T-p.at); if(dur<=0) return;
-      const s=oc.createBufferSource(); s.buffer=musicBuf; const gn=oc.createGain(); s.connect(gn); gn.connect(master);
-      const a=p.at, b=p.at+dur;
-      gn.gain.setValueAtTime(0,Math.max(0,a-X)); gn.gain.linearRampToValueAtTime(1,a+(i?X:0.03));
+      const s=oc.createBufferSource(); s.buffer=A.music; const gn=oc.createGain(); s.connect(gn); gn.connect(master);
+      const a=p.at, b=p.at+dur, first=i===0;
+      const fin=first?(tl.introVideo?X:0.03):X;
+      gn.gain.setValueAtTime(0,Math.max(0,a-X)); gn.gain.linearRampToValueAtTime(1,a+(first&&!tl.introVideo?0.03:X));
       if(!p.ending){ gn.gain.setValueAtTime(1,b-X); gn.gain.linearRampToValueAtTime(0,b+X); }
-      const pre=i?X:0; s.start(Math.max(0,a-pre),Math.max(0,p.from-pre),dur+pre+X);
+      const pre=X; s.start(Math.max(0,a-pre),Math.max(0,p.from-pre),dur+pre+X);
     });
   }
-  for(const v of voices){ const s=oc.createBufferSource(); s.buffer=v.buf; s.connect(oc.destination); s.start(v.at); }
+  // áudio que vem nos vídeos (intro e assinatura) e o efeito de cada transição
+  for(const p of tl.parts) if(p.clip&&A.clips[p.clip]){
+    const buf=A.clips[p.clip], s=oc.createBufferSource(); s.buffer=buf; const g=oc.createGain(); s.connect(g); g.connect(OUT);
+    const end=Math.min(p.end,p.start+buf.duration);
+    g.gain.setValueAtTime(1,p.start); g.gain.setValueAtTime(1,Math.max(p.start,end-0.015)); g.gain.linearRampToValueAtTime(0,end);
+    s.start(p.start,0,end-p.start);
+  }
+  if(A.clips.tr) for(const tr of tl.trans) play(A.clips.tr,tr.audioAt);
+  for(const v of voices) play(v.buf,v.at,vg);
   const out=await oc.startRendering();
-  // pico em -1 dB
+  // segurança: se passar de -1 dB, abaixa tudo junto
   let pk=0; for(let c=0;c<2;c++){ const d=out.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } }
-  const k=pk>0?0.89/pk:1; for(let c=0;c<2;c++){ const d=out.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=k; }
+  if(pk>0.95){ const k=0.95/pk; for(let c=0;c<2;c++){ const d=out.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=k; } }
   return out;
 }
 export function wavBlob(buf){
@@ -218,7 +235,7 @@ export function layoutOffer(ctx,it,model){
 }
 function drawSkewText(ctx,text,x,y,skew=-0.2){ ctx.save(); ctx.translate(x,y); ctx.transform(1,0,skew,1,0,0); ctx.fillText(text,0,0); ctx.restore(); }
 // desenha uma oferta no tempo local lt (segundos desde o corte da transição)
-export function drawOffer(ctx,it,img,L,lt,A){
+export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
   const intB=L.top+270, x0=L.x0;
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   // produto: cresce com um leve passo além (0,12 → 0,30 s)
@@ -227,17 +244,23 @@ export function drawOffer(ctx,it,img,L,lt,A){
     const k=easeBack(prog(lt,0.12,0.32),1.6);
     if(k>0.001){ ctx.save(); ctx.translate(540,1390); ctx.scale(k,k); ctx.drawImage(img,-w/2,-h/2,w,h); ctx.restore(); }
   }
+  const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
+  // quando o locutor fala o preço: o preço cresce um pouco e volta (ênfase)
+  let bs=1;
+  if(precoLt!=null&&pulo){ const u=(lt-(precoLt-pulo.antes))/pulo.dur; if(u>0&&u<1) bs=1+pulo.escala*Math.sin(Math.PI*u)*(u<0.5?1:1); }
+  ctx.save();
+  if(bs!==1){ const gx=x0+(L.intW+L.gap1+L.colW)/2, gy=L.top+135; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
   // inteiro do preço: entra crescendo
   { const q=prog(lt,0.30,0.44); if(q>0){ const s=0.35+0.65*easeBack(q,2.2); const cx=x0+L.intW/2, cy=intB-135;
     ctx.save(); ctx.globalAlpha=clamp(q*3); ctx.translate(cx,cy); ctx.scale(s,s); ctx.translate(-cx,-cy);
     ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; ctx.fillText(L.p.int,x0,intB);
     const colX=x0+L.intW+L.gap1; ctx.fillRect(colX-10,intB-53,55,53); ctx.restore(); } }
-  const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
   // centavos e unidade: pulam no lugar
   const pop=(a,b,fn)=>{ const q=prog(lt,a,b); if(q<=0) return; const s=easeBack(q,2); ctx.save(); ctx.globalAlpha=clamp(q*2); fn(s); ctx.restore(); };
   pop(0.46,0.58,s=>{ const cy=L.top+52; ctx.translate(cX,cy); ctx.scale(s,s); ctx.translate(-cX,-cy); ctx.font=`${L.cSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.p.cents,cX,L.top+100); });
   pop(0.66,0.78,s=>{ const cy=L.top+152; ctx.translate(cX,cy); ctx.scale(s,s); ctx.translate(-cX,-cy); ctx.font=`${L.uSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.unit,cX,L.top+190); });
   ctx.textAlign='left';
+  ctx.restore();
   // descrição e preço antigo: entram deslizando
   { const q=easeOut(prog(lt,0.56,0.74)); if(q>0){ const dx=(1-q)*40, x=colX+L.colW+L.gap2+dx;
     ctx.save(); ctx.globalAlpha=q;
@@ -278,7 +301,9 @@ export async function loadAssets(base,model,onStep=()=>{}){
   A.tr=await Promise.all([...Array(model.transicao.frames)].map(async(_,i)=>createImageBitmap(await (await fetch(`${base}${model.transicao.pasta}/${String(i).padStart(2,'0')}.webp`)).blob())));
   if(model.tag) A.tag=await createImageBitmap(await (await fetch(base+model.tag)).blob());
   onStep('trilha');
-  A.music=await decodeAudio(await (await fetch(base+model.trilha.src)).arrayBuffer());
+  const aud=async f=>f?decodeAudio(await (await fetch(base+f)).arrayBuffer()):null;
+  [A.music,A.clipIntro,A.clipAssina,A.clipTr]=await Promise.all([aud(model.trilha.src),aud(model.intro.audio),aud(model.assina.audio),aud(model.transicao.audio)]);
+  A.clips={intro:A.clipIntro,assina:A.clipAssina,tr:A.clipTr};
   await Promise.all(Object.values(F).map(f=>document.fonts.load(`40px ${f}`)));
   return A;
 }
@@ -297,9 +322,10 @@ function overlay(ctx,tl,model,A,imgs,datas,t,p){
   if(p.type==='oferta'){
     let L=LCACHE.get(p.item); if(!L){ L=layoutOffer(ctx,p.item,model); LCACHE.set(p.item,L); }
     drawValidity(ctx,model,datas);
-    drawOffer(ctx,p.item,imgs[p.idx],L,t-p.start,A);
+    drawOffer(ctx,p.item,imgs[p.idx],L,t-p.start,A,p.precoAt!=null?p.precoAt-p.start:null,model.precoPulo);
   }
-  for(const tr of tl.trans){ const f=Math.round((t-tr.start)*model.fps); if(f>=0&&f<A.tr.length) ctx.drawImage(A.tr[f],0,0,model.w,model.h); }
+  const trFps=model.transicao.fps||model.fps;
+  for(const tr of tl.trans){ const f=Math.floor((t-tr.start)*trFps+1e-6); if(f>=0&&f<A.tr.length) ctx.drawImage(A.tr[f],0,0,model.w,model.h); }
 }
 export function resetLayouts(items){ for(const it of items) LCACHE.delete(it); }
 

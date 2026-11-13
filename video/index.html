@@ -52,6 +52,14 @@ label.f{display:grid;gap:3px;font-size:12px;color:var(--mut)}
 video.out{max-height:640px;max-width:100%;border-radius:10px;background:#000}
 dialog{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:12px;max-width:560px;width:92vw}
 dialog::backdrop{background:#0009}
+.pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:62vh;overflow:auto}
+.pk{position:relative;border:2px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;background:#16191d;display:grid;gap:4px}
+.pk.on{border-color:var(--pri);background:#2a1715}
+.pk .pth{height:110px;background:#0c0d10 center/contain no-repeat;border-radius:6px}
+.pk .pn{font-size:11px;line-height:1.25}
+.pk .pp{font-size:12px;color:var(--ok)}
+.pk .num{position:absolute;top:6px;left:6px;background:var(--pri);color:#fff;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;font-weight:700;font-size:13px}
+.pk .num:empty{display:none}
 #toasts{position:fixed;right:14px;bottom:14px;display:grid;gap:8px;z-index:50}
 .toast{background:#22262d;border:1px solid #3a404a;border-left:4px solid var(--ok);padding:10px 14px;border-radius:8px;max-width:420px}
 .toast.err{border-left-color:#ff7b72}
@@ -74,7 +82,7 @@ dialog::backdrop{background:#0009}
   <section class="card">
     <h2><span class="n">1</span>Produtos</h2>
     <div class="row" style="margin-bottom:10px">
-      <button id="btn-from-gen">Trazer do Gerador de Ofertas</button>
+      <button id="btn-from-gen">Escolher produtos do Gerador</button>
       <button id="btn-add">+ Produto</button>
       <label class="f">Validade de <input id="in-from" type="date"></label>
       <label class="f">até <input id="in-to" type="date"></label>
@@ -87,8 +95,8 @@ dialog::backdrop{background:#0009}
   <section class="card">
     <h2><span class="n">2</span>Locução</h2>
     <div class="row" style="align-items:stretch">
-      <label class="f" style="flex:1;min-width:260px">Abertura <textarea id="in-intro" rows="2"></textarea></label>
-      <label class="f" style="flex:1;min-width:260px">Final <textarea id="in-fim" rows="2"></textarea></label>
+      <div style="flex:1;min-width:260px;display:grid;gap:4px"><label class="row st"><input type="checkbox" id="ck-intro"> Abertura: usar o áudio que vem no vídeo da intro (locução, trilha e efeitos)</label><label class="f" id="lb-intro">Abertura (locução gerada) <textarea id="in-intro" rows="2"></textarea></label></div>
+      <div style="flex:1;min-width:260px;display:grid;gap:4px"><label class="row st"><input type="checkbox" id="ck-fim"> Final: usar o áudio que vem no vídeo da assinatura</label><label class="f" id="lb-fim">Final (locução gerada) <textarea id="in-fim" rows="2"></textarea></label></div>
     </div>
     <div class="row" style="margin-top:8px">
       <button class="pri" id="btn-tts">Gerar locução</button>
@@ -100,7 +108,7 @@ dialog::backdrop{background:#0009}
   <section class="card">
     <h2><span class="n">3</span>Vídeo</h2>
     <div class="row">
-      <label class="f">Trilha abaixo da voz <select id="in-mdb"><option value="6">6 dB (mais alta)</option><option value="8">8 dB</option><option value="10" selected>10 dB</option><option value="12">12 dB</option><option value="15">15 dB (mais baixa)</option></select></label>
+      <label class="f">Volume da trilha nas ofertas <select id="in-mdb"><option value="4">+4 dB</option><option value="2">+2 dB</option><option value="0" selected>igual à intro</option><option value="-2">−2 dB</option><option value="-4">−4 dB</option><option value="-6">−6 dB</option></select></label>
       <button id="btn-thumbs">Ver quadros</button>
       <button class="pri" id="btn-render">Gerar vídeo MP4</button>
       <div class="prog"><div id="prog"></div></div>
@@ -127,6 +135,13 @@ dialog::backdrop{background:#0009}
     </div>
   </div>
   <div class="row" style="margin-top:12px;justify-content:flex-end"><button id="el-close" class="pri">Fechar</button></div>
+</dialog>
+
+<dialog id="dlg-pick" style="max-width:980px">
+  <h3 id="pick-title" style="margin-top:0">Escolha os produtos</h3>
+  <p class="hint" style="margin-top:-6px">Toque nos produtos que o cliente pediu. A ordem dos toques é a ordem no vídeo.</p>
+  <div id="pick-list" class="pick"></div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end"><button id="pick-cancel">Cancelar</button><button id="pick-all">Usar todos</button><button id="pick-ok" class="pri">Usar 0 produtos</button></div>
 </dialog>
 
 <dialog id="dlg-jobs">
