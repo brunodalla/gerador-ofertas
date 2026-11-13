@@ -310,7 +310,7 @@ export async function renderMp4({tl,model,A,imgs,datas,audio,onProgress=()=>{},s
   const aCodec=(await canEncodeAudio('aac',{numberOfChannels:2,sampleRate:SR}))?'aac':'opus';
   const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d',{alpha:false});
   const output=new Output({format:new Mp4OutputFormat({fastStart:'in-memory'}),target:new BufferTarget()});
-  const vsrc=new CanvasSource(canvas,{codec:'avc',bitrate:12e6,keyFrameInterval:2,latencyMode:'quality'});
+  const vsrc=new CanvasSource(canvas,{codec:'avc',bitrate:10e6,keyFrameInterval:2,latencyMode:'quality'});
   output.addVideoTrack(vsrc,{frameRate:fps});
   const asrc=new AudioBufferSource({codec:aCodec,bitrate:192e3});
   output.addAudioTrack(asrc);

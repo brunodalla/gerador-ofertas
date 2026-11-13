@@ -25,7 +25,7 @@
     "oferta": "{nome}, apenas {preco}{unidade}{clube}!",
     "falaUnidade": false
   },
-  "tempos": { "introVoz": 0.4, "ofertaVoz": 0.3, "ofertaMin": 2.6, "ofertaFolga": 0.5, "assinaVoz": 0.6, "fimFolga": 0.25 },
+  "tempos": { "introVoz": 0.4, "ofertaVoz": 0.25, "ofertaMin": 2.6, "ofertaFolga": 0.35, "assinaVoz": 0.6, "fimFolga": 0.25 },
   "tag": "noclube.png",
   "validade": {
     "linha1": "OFERTAS VÁLIDAS PARA {datas} OU ENQUANTO DURAREM OS ESTOQUES",

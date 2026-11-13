@@ -254,6 +254,7 @@ async function render(){
     const share=navigator.canShare&&navigator.canShare({files:[new File([blob],name,{type:'video/mp4'})]});
     $('#out').append(el('video',{class:'out',src:url,controls:true}),el('div',{class:'row',style:'margin-top:8px'},
       el('a',{class:'btn',href:url,download:name},'Baixar MP4'),
+      window.showSaveFilePicker?el('button',{onclick:async()=>{ try{ const h=await window.showSaveFilePicker({suggestedName:name,id:'video-saidas',types:[{description:'Vídeo MP4',accept:{'video/mp4':['.mp4']}}]}); const w=await h.createWritable(); await w.write(blob); await w.close(); toast('Vídeo salvo: '+h.name); }catch(e){ if(e.name!=='AbortError') toast('Não consegui salvar: '+e.message,'err'); } }},'Salvar na pasta…'):null,
       share?el('button',{onclick:()=>navigator.share({files:[new File([blob],name,{type:'video/mp4'})]}).catch(()=>{})},'Compartilhar'):null,
       el('span',{class:'st'},`${(blob.size/1e6).toFixed(1)} MB · ${tl.T.toFixed(1)} s`)));
     st('st-render','Vídeo pronto ✓','ok');
