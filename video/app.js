@@ -219,8 +219,9 @@ async function segAudio(s,{create=false,fresh=false}={}){
 }
 let PLAYING=null;
 function play(buf){ if(PLAYING){ try{ PLAYING.stop(); }catch(e){} } const ac=new AudioContext(); const s=ac.createBufferSource(); s.buffer=buf; s.connect(ac.destination); s.start(); PLAYING=s; }
+let SEGRUN=0;
 async function renderSegs(){
-  const box=$('#segs'); box.innerHTML='';
+  const run=++SEGRUN; const box=document.createDocumentFragment();
   const list=segList(); let missing=0;
   for(const s of list){
     const buf=await segAudio(s).catch(()=>null); if(!buf) missing++;
@@ -230,6 +231,8 @@ async function renderSegs(){
         el('button',{disabled:!buf,onclick:()=>play(buf)},'▶'),
         el('button',{title:'Gerar de novo este trecho (outra leitura)',onclick:async e=>{ e.target.disabled=true; info.textContent='gerando…'; try{ const b=await segAudio(s,{create:true,fresh:true}); play(b); renderSegs(); }catch(er){ toast(er.message,'err'); info.textContent='erro'; e.target.disabled=false; } }},buf?'Refazer':'Gerar'))));
   }
+  if(run!==SEGRUN) return;   // outra atualização começou depois desta
+  $('#segs').replaceChildren(box);
   $('#btn-tts').textContent=missing?`Gerar locução (${missing} trecho${missing>1?'s':''})`:'Locução pronta ✓';
   $('#btn-tts').disabled=!missing;
   updTimeline();
