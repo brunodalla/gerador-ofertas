@@ -237,7 +237,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
     </div>
   </div>
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
-  <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
+  <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
 <section id="bankview">
   <div id="bk-conn" class="step"><h3>Banco de imagens</h3><div class="st">Conecte o banco para ver, buscar, trocar e enviar imagens de produtos.</div>
@@ -3136,6 +3136,27 @@ function applyChanges(){
   toast(`${n} alteração(ões) aplicada(s). Confira as artes marcadas.`);
 }
 
+// [VIDEO] ---- início do bloco do chat dos vídeos (não apagar; levar para o código-fonte) ----
+// Botão "Gerar vídeo deste trabalho": guarda os produtos (nome, preços, unidade e a foto já escolhida)
+// em IndexedDB 'gerador-ofertas' / chave 'video:handoff' e abre a página /video/, que lê dali.
+async function sendToVideo(){
+  if(!S.grids.length){ toast('Abra primeiro um trabalho (planilha, texto colado ou trabalho anterior).','err'); return; }
+  const win=window.open('about:blank','_blank');
+  try{
+    const items=[];
+    for(const g of S.grids){
+      const its=g.items.filter(i=>!i.removed&&i.slot).sort((a,b)=>(SLOT_ORDER.indexOf(a.slot)-SLOT_ORDER.indexOf(b.slot))||(a.i-b.i));
+      for(const it of (its.length?its:g.items.filter(i=>!i.removed))){
+        let img=null; const id=(it.imgIds||[])[0];
+        if(id){ try{ const c=await getImage(id); if(c){ const cv=document.createElement('canvas'); cv.width=c.width; cv.height=c.height; cv.getContext('2d').drawImage(c,0,0); img=await new Promise(r=>cv.toBlob(r,'image/png')); } }catch(e){ console.warn(e); } }
+        items.push({name:it.name,unit:it.unit||'UND',price:it.price??'',club:it.club??'',img});
+      }
+    }
+    await IDB.set('video:handoff',{at:Date.now(),title:S.jobTitle||S.sheetName||'',from:$('#in-from').value,to:$('#in-to').value,items});
+    if(win) win.location.href='video/#gerador'; else location.href='video/#gerador';
+  }catch(e){ if(win) win.close(); console.error(e); toast('Não consegui abrir o vídeo: '+e.message,'err'); }
+}
+// [VIDEO] ---- fim do bloco do chat dos vídeos ----
 // ---------- storage ----------
 const IDB={db:null,
   async open(){ if(this.db) return this.db; this.db=await new Promise((res,rej)=>{ const r=indexedDB.open('gerador-ofertas',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return this.db; },
@@ -3840,7 +3861,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
     S.grids.forEach((g,gi)=>{ const m=$('#grid-'+gi+' .gmeta'); if(m) m.replaceWith(gridMetaUI(gi)); });   // Proner/Bigolin/Destak: the fixed "tarja" goes to every art without its own
     renderSoon(); });
-  $('#btn-save').onclick=saveAll; $('#btn-dlall').onclick=downloadAll;
+  $('#btn-save').onclick=saveAll; $('#btn-dlall').onclick=downloadAll; $('#btn-video').onclick=()=>sendToVideo();
   $('#file-rev').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(!S.grids.length){ toast('Abra primeiro a planilha original.','err'); return; } if(f) applyRevision(f); };
   $('#rev-close').onclick=()=>$('#revision').close();
   $('#btn-chg').onclick=()=>{ if(!S.grids.length){ toast('Abra primeiro a planilha.','err'); return; } $('#chg-text').value=''; $('#chg-list').innerHTML=''; $('#changes').showModal(); $('#chg-text').focus(); };
