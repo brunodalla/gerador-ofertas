@@ -1,5 +1,6 @@
 // Página "Vídeo de ofertas" (pasta /video/ do Gerador de Ofertas). Só o chat dos vídeos mexe aqui.
 import * as E from './engine.js';
+import {parseLista,BANK,bankConnect,bankSearch,bankFile} from './banco.js';
 
 const $=(q,el=document)=>el.querySelector(q);
 const el=(tag,attrs={},...kids)=>{ const e=document.createElement(tag); for(const [k,v] of Object.entries(attrs)){ if(k==='class') e.className=v; else if(k.startsWith('on')) e.addEventListener(k.slice(2),v); else if(k==='value') e.value=v; else if(v!==false&&v!=null) e.setAttribute(k,v===true?'':v); } for(const k of kids.flat()) if(k!=null) e.append(k.nodeType?k:document.createTextNode(k)); return e; };
@@ -68,7 +69,7 @@ async function trimBitmap(bmp){
 }
 function renderItems(){
   const box=$('#items'); box.innerHTML='';
-  if(!V.job.items.length){ box.append(el('div',{class:'st'},'Nenhum produto. Use "Trazer do Gerador de Ofertas" (abre os produtos do trabalho aberto lá) ou "+ Produto".')); return; }
+  if(!V.job.items.length){ box.append(el('div',{class:'st'},'Nenhum produto ainda. Cole a lista que o cliente mandou em "Colar lista de produtos", traga do Gerador de Ofertas ou adicione um por um em "+ Produto".')); return; }
   V.job.items.forEach((it,i)=>{
     const th=el('div',{class:'th',title:'Trocar a foto',onclick:()=>pickImage(it)});
     if(it.img){ th.style.backgroundImage=`url(${URL.createObjectURL(it.img)})`; th.classList.add('has'); }
@@ -80,7 +81,7 @@ function renderItems(){
       th,
       el('div',{style:'display:grid;gap:6px'},
         el('div',{class:'fs'},
-          el('label',{class:'f'},'Texto na tela',el('input',{value:it.tela||it.name,onchange:e=>upd('tela',e.target.value)})),
+          el('label',{class:'f'},'Texto na tela',el('input',{value:it.tela||it.name,onchange:e=>{ const v=e.target.value; if(!it.name||it.name==='PRODUTO'||it.name===it.tela){ it.name=v.toUpperCase(); if(!it.falado) fal.value=itemFalado(it); } upd('tela',v); if(!it.img) autoImage(it).then(ok=>{ if(ok){ saveJob(); renderItems(); } }); }})),
           el('label',{class:'f'},'Preço normal',el('input',{value:it.price??'',placeholder:'4,99',onchange:e=>upd('price',e.target.value)})),
           el('label',{class:'f'},'Preço clube',el('input',{value:it.club??'',placeholder:'(sem)',onchange:e=>upd('club',e.target.value)})),
           el('label',{class:'f'},'Unidade',el('input',{value:it.unit||'UND',onchange:e=>upd('unit',e.target.value.toUpperCase())})),
@@ -93,9 +94,63 @@ function renderItems(){
     box.append(row);
   });
 }
+// ---------- fotos: Banco de Produtos, arquivo ou imagem colada ----------
+const IMGMEM_KEY='video.img.v1'; let IMGMEM=LS.get(IMGMEM_KEY,{});
+function setItemImg(it,blob,file){ it.img=blob; V.imgs.delete(it.id); if(file){ IMGMEM[E.norm(it.name)]=file; LS.set(IMGMEM_KEY,IMGMEM); } saveJob(); renderItems(); }
+async function autoImage(it){
+  if(it.img||!BANK.items.length) return false;
+  const mem=IMGMEM[E.norm(it.name)]; let f=mem?await bankFile(mem):null;
+  if(!f){ const r=bankSearch(it.name,1)[0]; if(r&&r.score>=0.55) f=await r.it.handle.getFile(); }
+  if(f){ it.img=f; V.imgs.delete(it.id); return true; } return false;
+}
+async function bankStatus(interactive=false){
+  const b=$('#btn-bank');
+  try{
+    const r=await bankConnect(IDB,interactive);
+    if(r.ok){ b.textContent=`Banco: ${r.count} fotos ✓`; b.title=r.name; return true; }
+    b.textContent=r.name?`Reabrir banco (${r.name})`:'Conectar Banco de Produtos';
+  }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); }
+  return false;
+}
 let PICK=null;
-function pickImage(it){ PICK=it; $('#file-img').value=''; $('#file-img').click(); }
-$('#file-img').onchange=async e=>{ const f=e.target.files[0]; if(!f||!PICK) return; PICK.img=f; V.imgs.delete(PICK.id); saveJob(); renderItems(); PICK=null; };
+async function pickImage(it){
+  PICK=it; const d=$('#dlg-img'), q=$('#img-q'), grid=$('#img-grid');
+  $('#img-for').textContent=it.tela||it.name;
+  const show=async()=>{
+    grid.innerHTML='';
+    if(!BANK.items.length){ grid.append(el('div',{class:'st'},'Banco de Produtos não conectado. Toque em "Conectar banco" ou envie um arquivo.')); return; }
+    const res=bankSearch(q.value,30);
+    if(!res.length){ grid.append(el('div',{class:'st'},'Nada encontrado. Tente outras palavras.')); return; }
+    for(const r of res){
+      const card=el('div',{class:'pk',title:r.it.name,onclick:async()=>{ setItemImg(it,await r.it.handle.getFile(),r.it.file); d.close(); }},el('div',{class:'pth'}),el('div',{class:'pn'},r.it.name));
+      grid.append(card);
+      r.it.handle.getFile().then(f=>{ card.querySelector('.pth').style.backgroundImage=`url(${URL.createObjectURL(f)})`; });
+    }
+  };
+  q.value=it.name; q.oninput=()=>{ clearTimeout(q._t); q._t=setTimeout(show,250); };
+  $('#img-bank').onclick=async()=>{ if(await bankStatus(true)) show(); };
+  $('#img-file').onclick=()=>{ $('#file-img').value=''; $('#file-img').click(); };
+  d.onpaste=e=>{ const f=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith('image/')); if(f){ setItemImg(it,f); d.close(); } };
+  $('#img-paste').onclick=async()=>{ try{ for(const ci of await navigator.clipboard.read()){ const t=ci.types.find(t=>t.startsWith('image/')); if(t){ setItemImg(it,await ci.getType(t)); d.close(); return; } } toast('Não tem imagem copiada.','err'); }catch(e){ toast('Use Ctrl+V com a janela aberta.','err'); } };
+  d.showModal(); show();
+}
+$('#file-img').onchange=async e=>{ const f=e.target.files[0]; if(!f||!PICK) return; setItemImg(PICK,f); $('#dlg-img').close(); PICK=null; };
+// colar a lista de produtos como o cliente manda
+function openLista(){
+  const d=$('#dlg-list'); $('#list-txt').value=''; $('#list-prev').textContent='';
+  $('#list-txt').oninput=()=>{ const r=parseLista($('#list-txt').value); $('#list-prev').textContent=r.length?r.map(x=>`• ${x.name} — ${x.club?`R$ ${x.club} clube (normal ${x.price||'—'})`:`R$ ${x.price}`}${x.unit!=='UND'?' '+x.unit:''}`).join('\n'):'Nenhuma linha com preço ainda.'; };
+  const go=async replace=>{
+    const r=parseLista($('#list-txt').value); if(!r.length){ toast('Não achei preços na lista.','err'); return; }
+    const novos=r.map(x=>({id:newId(),name:x.name,tela:x.name,price:x.price,club:x.club,unit:x.unit,img:null,on:true}));
+    V.job.items=replace?novos:V.job.items.concat(novos); d.close();
+    if(!BANK.items.length) await bankStatus(true);
+    let n=0; for(const it of novos) if(await autoImage(it)) n++;
+    saveJob(); renderItems(); renderSegs();
+    toast(`${novos.length} produtos adicionados${BANK.items.length?` · ${n} com foto do banco`:''}. Confira as fotos tocando nelas.`);
+  };
+  $('#list-add').onclick=()=>go(false); $('#list-rep').onclick=()=>go(true);
+  d.showModal(); $('#list-txt').focus();
+}
 // "06/11" ou "06/11/2026" (como o Gerador guarda) → "2026-11-06"
 function isoDate(s){
   s=String(s||'').trim(); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
@@ -340,6 +395,10 @@ async function init(){
   $('#ck-intro').onchange=e=>{ V.job.introVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
   $('#ck-fim').onchange=e=>{ V.job.fimVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
   $('#btn-add').onclick=()=>{ V.job.items.push({id:newId(),name:'PRODUTO',tela:'PRODUTO',price:'',club:'',unit:'UND',img:null,on:true}); saveJob(); renderItems(); renderSegs(); };
+  $('#btn-list').onclick=openLista;
+  $('#btn-bank').onclick=()=>bankStatus(true);
+  $('#btn-new').onclick=async()=>{ if(V.job.items.length&&!confirm('Começar um vídeo novo? Este fica guardado em "Vídeos anteriores".')) return; await openJob(blankJob()); saveJob(); };
+  bankStatus(false);
   $('#btn-tts').onclick=genAll;
   $('#btn-thumbs').onclick=thumbs;
   $('#btn-render').onclick=render;

@@ -72,6 +72,7 @@ dialog::backdrop{background:#0009}
   <h1>Vídeo de ofertas</h1>
   <label class="f">Modelo <select id="sel-model"></select></label>
   <label class="f">Nome deste vídeo <input id="in-title" placeholder="ex.: Detona Preço 20/11"></label>
+  <button id="btn-new">+ Vídeo novo</button>
   <button id="btn-jobs">Vídeos anteriores</button>
   <button id="btn-el">ElevenLabs…</button>
   <span id="st-el" class="st"></span>
@@ -82,8 +83,10 @@ dialog::backdrop{background:#0009}
   <section class="card">
     <h2><span class="n">1</span>Produtos</h2>
     <div class="row" style="margin-bottom:10px">
+      <button id="btn-list" class="pri">Colar lista de produtos</button>
       <button id="btn-from-gen">Escolher produtos do Gerador</button>
       <button id="btn-add">+ Produto</button>
+      <button id="btn-bank" title="A mesma pasta BANCO DE PRODUTOS do Gerador">Conectar Banco de Produtos</button>
       <label class="f">Validade de <input id="in-from" type="date"></label>
       <label class="f">até <input id="in-to" type="date"></label>
       <label class="f" style="flex:1;min-width:240px">Texto da validade (lateral) <input id="in-val" placeholder="06 A 08 DE NOVEMBRO"></label>
@@ -142,6 +145,21 @@ dialog::backdrop{background:#0009}
   <p class="hint" style="margin-top:-6px">Toque nos produtos que o cliente pediu. A ordem dos toques é a ordem no vídeo.</p>
   <div id="pick-list" class="pick"></div>
   <div class="row" style="margin-top:12px;justify-content:flex-end"><button id="pick-cancel">Cancelar</button><button id="pick-all">Usar todos</button><button id="pick-ok" class="pri">Usar 0 produtos</button></div>
+</dialog>
+
+<dialog id="dlg-list" style="max-width:760px">
+  <h3 style="margin-top:0">Colar lista de produtos</h3>
+  <p class="hint" style="margin-top:-6px">Cole como o cliente mandou: um produto por linha, com o preço. Com dois preços, o menor vira o preço do clube. "kg" perto do preço vira preço por quilo.</p>
+  <textarea id="list-txt" rows="9" placeholder="Refrigerante Refriko 2L  R$ 4,99  clube 3,99&#10;Coxa e sobrecoxa kg 6,99&#10;Farinha de trigo Specht 5kg 13,99"></textarea>
+  <pre id="list-prev" class="st" style="white-space:pre-wrap;max-height:180px;overflow:auto;margin:8px 0 0"></pre>
+  <div class="row" style="margin-top:12px;justify-content:flex-end"><button onclick="this.closest('dialog').close()">Cancelar</button><button id="list-add">Adicionar aos produtos</button><button id="list-rep" class="pri">Usar só esta lista</button></div>
+</dialog>
+
+<dialog id="dlg-img" style="max-width:980px">
+  <h3 style="margin-top:0">Foto de: <span id="img-for"></span></h3>
+  <div class="row"><input id="img-q" style="flex:1;min-width:220px" placeholder="buscar no banco"><button id="img-bank">Conectar banco</button><button id="img-file">Enviar arquivo…</button><button id="img-paste">Colar imagem</button></div>
+  <div id="img-grid" class="pick" style="margin-top:10px"></div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end"><button onclick="this.closest('dialog').close()">Fechar</button></div>
 </dialog>
 
 <dialog id="dlg-jobs">
