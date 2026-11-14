@@ -256,17 +256,30 @@ export function productBoxes(img,it={},L=null,cfg=null){
     return {i,k:n-1-i,x:cx+ox-bw/2,y:cy+h/2-bh,w:bw,h:bh}; });
   return {cx,cy,boxes};
 }
-// fotos diferentes lado a lado (ex.: duas marcas na mesma oferta), mesma altura, um pouco sobrepostas
+// fotos diferentes na mesma oferta (ex.: duas marcas). Caixas largas (bombom, biscoito) ficam uma em cima
+// da outra; garrafas e embalagens altas ficam lado a lado. it.arranjo: 'auto' | 'lado' | 'pilha'
+export function arranjoDe(imgs,it={}){
+  if(it.arranjo==='lado'||it.arranjo==='pilha') return it.arranjo;
+  const ars=imgs.map(i=>i.width/i.height), m=ars.reduce((a,b)=>a+b,0)/ars.length;
+  return m>1.15?'pilha':'lado';
+}
 function productBoxesMulti(imgs,it={},L=null,cfg=null){
   const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};
   const top=Math.max(C.topo,L&&L.textBottom?L.textBottom+30:C.topo), bot=C.base, boxH=bot-top;
-  const ars=imgs.map(i=>i.width/i.height), ov=0.88;           // cada foto anda 88% da largura da anterior
-  const unitW=ars.reduce((s,a,i)=>s+(i<ars.length-1?a*ov:a),0); // largura total para altura 1
-  let h=Math.min(boxH,C.maxW/unitW,Math.sqrt(C.area*1.25/unitW));
-  h*=it.esc||1;
-  const totalW=unitW*h, cx=C.cx+(it.dx||0), cy=top+boxH/2+(it.dy||0);
-  let x=cx-totalW/2; const n=imgs.length;
-  const boxes=imgs.map((img,i)=>{ const w=ars[i]*h; const b={i,k:n-1-i,img,x,y:cy+h/2-h,w,h}; x+=w*(i<n-1?ov:1); return b; });
+  const ars=imgs.map(i=>i.width/i.height), n=imgs.length, cx=C.cx+(it.dx||0), cy=top+boxH/2+(it.dy||0);
+  if(arranjoDe(imgs,it)==='pilha'){
+    const ov=0.93;                                              // cada caixa desce 93% da altura da de cima
+    const unitH=ars.reduce((s,a,i)=>s+(i<n-1?ov/a:1/a),0);       // altura total para largura 1
+    let w=Math.min(C.maxW,boxH/unitH,Math.sqrt(C.area*1.3/unitH)); w*=it.esc||1;
+    let y=cy-unitH*w/2;
+    const boxes=imgs.map((img,i)=>{ const h=w/ars[i]; const b={i,k:i,img,x:cx-w/2,y,w,h}; y+=h*(i<n-1?ov:1); return b; });
+    return {cx,cy,boxes};
+  }
+  const ov=0.88;                                                // cada foto anda 88% da largura da anterior
+  const unitW=ars.reduce((s,a,i)=>s+(i<n-1?a*ov:a),0);         // largura total para altura 1
+  let h=Math.min(boxH,C.maxW/unitW,Math.sqrt(C.area*1.25/unitW)); h*=it.esc||1;
+  let x=cx-unitW*h/2;
+  const boxes=imgs.map((img,i)=>{ const w=ars[i]*h; const b={i,k:n-1-i,img,x,y:cy-h/2,w,h}; x+=w*(i<n-1?ov:1); return b; });
   return {cx,cy,boxes};
 }
 // produto com as cópias entrando uma depois da outra (a da direita primeiro)

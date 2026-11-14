@@ -1,6 +1,6 @@
 // Página "Vídeo de ofertas" (pasta /video/ do Gerador de Ofertas). Só o chat dos vídeos mexe aqui.
 import * as E from './engine.js';
-import {parseLista,BANK,bankConnect,bankSearch,bankFile} from './banco.js';
+import {parseLista,BANK,bankConnect,bankSearch,bankFile,usaDrive,gdLoadGis} from './banco.js';
 
 const $=(q,el=document)=>el.querySelector(q);
 const el=(tag,attrs={},...kids)=>{ const e=document.createElement(tag); for(const [k,v] of Object.entries(attrs)){ if(k==='class') e.className=v; else if(k.startsWith('on')) e.addEventListener(k.slice(2),v); else if(k==='value') e.value=v; else if(v!==false&&v!=null) e.setAttribute(k,v===true?'':v); } for(const k of kids.flat()) if(k!=null) e.append(k.nodeType?k:document.createTextNode(k)); return e; };
@@ -95,7 +95,8 @@ function renderItems(){
       rng('Para cima / baixo','dy',-350,350,5,0,v=>(v>0?'+':'')+v),
       rng('Para os lados','dx',-300,300,5,0,v=>(v>0?'+':'')+v),
       el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); drawPreview(it,pv); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' lado a lado'); if((it.copias||1)===n) o.selected=true; return o; }))),
-      el('button',{class:'lnk',onclick:()=>{ delete it.esc; delete it.dx; delete it.dy; delete it.copias; saveJob(); renderItems(); }},'voltar ao padrão'));
+      nf>1?el('label',{class:'f'},'Fotos',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado']].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
+      el('button',{class:'lnk',onclick:()=>{ delete it.esc; delete it.dx; delete it.dy; delete it.copias; delete it.arranjo; saveJob(); renderItems(); }},'voltar ao padrão'));
     const say=el('div',{class:'say'},'🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model));
     const fal=el('input',{value:itemFalado(it),title:'Como a voz lê o produto',onchange:e=>{ const v=e.target.value.trim(); it.falado=v; if(v&&v!==E.nomeFaladoAuto(it.name)){ FALADO[E.norm(it.name)]=v; } else delete FALADO[E.norm(it.name)]; LS.set(FALADO_KEY,FALADO); upd('falado',v); }});
     const row=el('div',{class:'it'+(it.on?'':' off')},
@@ -146,15 +147,20 @@ async function autoImage(it){
   if(!f){ const r=bankSearch(it.name,1)[0]; if(r&&r.score>=0.7) f=await r.it.handle.getFile(); }
   if(f){ it.img=f; clearImg(it); return true; } return false;
 }
-async function bankStatus(interactive=false){
+async function bankStatus(interactive=false,via=''){
   const b=$('#btn-bank');
   try{
-    const r=await bankConnect(IDB,interactive);
+    if(interactive){ b.disabled=true; b.textContent='Abrindo o banco…'; }
+    const r=await bankConnect(IDB,interactive,via);
     if(r.ok){ b.textContent=`Banco: ${r.count} fotos ✓`; b.title=r.name; return true; }
-    b.textContent=r.name?`Reabrir banco (${r.name})`:'Conectar Banco de Produtos';
-  }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); }
+    b.textContent=r.name?`Reabrir banco (${r.name})`:r.drive?'Conectar Banco (Google Drive)':'Conectar Banco de Produtos';
+  }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); b.textContent=usaDrive()?'Conectar Banco (Google Drive)':'Conectar Banco de Produtos'; }
+  finally{ b.disabled=false; }
   return false;
 }
+// miniaturas do banco: no máximo 6 downloads ao mesmo tempo (no Google Drive cada foto vem pela internet)
+const TQ={n:0,q:[]};
+function thumbQ(fn){ return new Promise((res,rej)=>{ const run=()=>{ TQ.n++; fn().then(res,rej).finally(()=>{ TQ.n--; const nx=TQ.q.shift(); if(nx) nx(); }); }; TQ.n<6?run():TQ.q.push(run); }); }
 let PICK=null, PICKADD=false;
 async function pickImage(it,add=false){
   PICK=it; PICKADD=add; const d=$('#dlg-img'), q=$('#img-q'), grid=$('#img-grid');
@@ -167,7 +173,7 @@ async function pickImage(it,add=false){
     for(const r of res){
       const card=el('div',{class:'pk',title:r.it.name,onclick:async()=>{ setItemImg(it,await r.it.handle.getFile(),r.it.file); d.close(); }},el('div',{class:'pth'}),el('div',{class:'pn'},r.it.name));
       grid.append(card);
-      r.it.handle.getFile().then(f=>{ card.querySelector('.pth').style.backgroundImage=`url(${URL.createObjectURL(f)})`; });
+      thumbQ(()=>r.it.handle.getFile()).then(f=>{ card.querySelector('.pth').style.backgroundImage=`url(${URL.createObjectURL(f)})`; }).catch(()=>{});
     }
   };
   q.value=it.name; q.oninput=()=>{ clearTimeout(q._t); q._t=setTimeout(show,250); };
@@ -442,6 +448,9 @@ async function init(){
   $('#btn-add').onclick=()=>{ V.job.items.push({id:newId(),name:'PRODUTO',tela:'PRODUTO',price:'',club:'',unit:'UND',img:null,on:true}); saveJob(); renderItems(); renderSegs(); };
   $('#btn-list').onclick=openLista;
   $('#btn-bank').onclick=()=>bankStatus(true);
+  if(window.showDirectoryPicker){ const v=$('#btn-bank-via'); const lab=()=>{ v.textContent=usaDrive()?'usar pasta do computador':'usar Google Drive'; }; lab(); v.hidden=false;
+    v.onclick=async()=>{ const via=usaDrive()?'pasta':'drive'; if(await bankStatus(true,via)) lab(); }; }
+  if(usaDrive()) gdLoadGis().catch(()=>{});
   $('#btn-new').onclick=async()=>{ if(V.job.items.length&&!confirm('Começar um vídeo novo? Este fica guardado em "Vídeos anteriores".')) return; await openJob(blankJob()); saveJob(); };
   bankStatus(false);
   $('#btn-tts').onclick=genAll;
