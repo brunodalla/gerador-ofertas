@@ -128,7 +128,7 @@ function drawPreview(it,cv){
     try{
       const A=await assets();
       if(!PVBG||PVBG.id!==V.model.id){ const id=V.model.id; const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); const bmp=await createImageBitmap(c.canvas); if(id===V.model.id) PVBG={id,bmp}; }
-      const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d');
+      const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d'); x.imageSmoothingQuality='high';
       x.drawImage(PVBG.bmp,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
       E.drawValidity(x,V.model,V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
       cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
@@ -373,7 +373,7 @@ async function thumbs(){
   const box=$('#thumbs'); box.innerHTML=''; st('st-render','Montando quadros…');
   try{
     const A=await assets(); const {tl,items}=await currentTimeline(); const imgs=await imgsFor(items); E.resetLayouts(items);
-    const big=document.createElement('canvas'); big.width=V.model.w; big.height=V.model.h; const ctx=big.getContext('2d');
+    const big=document.createElement('canvas'); big.width=V.model.w; big.height=V.model.h; const ctx=big.getContext('2d'); ctx.imageSmoothingQuality='high';
     for(const p of tl.parts.filter(p=>p.type==='oferta')){
       await E.drawFrameAt(ctx,tl,V.model,A,imgs,V.job.val,Math.max(p.start+0.1,Math.min(p.end-0.5,p.start+2.8)));
       const c=document.createElement('canvas'); c.width=360; c.height=640; c.getContext('2d').drawImage(big,0,0,360,640); box.append(c);

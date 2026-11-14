@@ -488,7 +488,7 @@ export function drawValidity(ctx,model,datas){
 
 // ---------------- vídeos de base ----------------
 export async function openVideo(src){
-  // o arquivo inteiro fica na memória: o fundo volta ao começo a cada oferta
+  // o arquivo inteiro fica na memória: o fundo volta ao começo a cada oferta e, se a oferta for mais longa, para no último quadro
   const blob=typeof src==='string'?await (await fetch(src)).blob():src;
   const input=new Input({source:new BlobSource(blob),formats:ALL_FORMATS});
   const track=await input.getPrimaryVideoTrack(); const dur=await track.computeDuration();
@@ -518,7 +518,7 @@ export async function loadAssets(base,model,onStep=()=>{}){
 export async function drawFrameAt(ctx,tl,model,A,imgs,datas,t){
   const p=tl.parts.find(p=>t>=p.start&&t<p.end)||tl.parts[tl.parts.length-1];
   const src=p.type==='intro'?A.intro:p.type==='assina'?A.assina:A.fundo;
-  let lt=t-p.start; if(p.type==='oferta') lt=lt%A.fundo.dur; lt=Math.min(lt,src.dur-1/60);
+  let lt=t-p.start; lt=Math.min(lt,src.dur-1/60);   // oferta mais longa que o fundo: fica parado no último quadro
   const c=await src.sink.getCanvas(lt);
   ctx.clearRect(0,0,model.w,model.h); if(c) ctx.drawImage(c.canvas,0,0,model.w,model.h);
   overlay(ctx,tl,model,A,imgs,datas,t,p);
@@ -540,7 +540,7 @@ export async function renderMp4({tl,model,A,imgs,datas,audio,onProgress=()=>{},s
   const {w,h,fps}=model;
   if(!(await canEncodeVideo('avc',{width:w,height:h}))) throw new Error('Este navegador não consegue gerar vídeo H.264. Use o Chrome ou o Edge atualizados.');
   const aCodec=(await canEncodeAudio('aac',{numberOfChannels:2,sampleRate:SR}))?'aac':'opus';
-  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d',{alpha:false});
+  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d',{alpha:false}); ctx.imageSmoothingQuality='high';
   const output=new Output({format:new Mp4OutputFormat({fastStart:'in-memory'}),target:new BufferTarget()});
   const vsrc=new CanvasSource(canvas,{codec:'avc',bitrate:10e6,keyFrameInterval:2,latencyMode:'quality'});
   output.addVideoTrack(vsrc,{frameRate:fps});
@@ -557,7 +557,7 @@ export async function renderMp4({tl,model,A,imgs,datas,audio,onProgress=()=>{},s
       if(it&&it.return) await it.return();
       curPart=p; const src=p.type==='intro'?A.intro:p.type==='assina'?A.assina:A.fundo;
       const nf=Math.round((p.end-p.start)*fps);
-      const ts=function*(){ for(let i=0;i<nf+2;i++){ let lt=i/fps; if(p.type==='oferta') lt=lt%src.dur; yield Math.min(lt,src.dur-1/60); } };
+      const ts=function*(){ for(let i=0;i<nf+2;i++){ let lt=i/fps; yield Math.min(lt,src.dur-1/60); } };
       it=src.sink.canvasesAtTimestamps(ts());
     }
     const r=await it.next(); const wc=r.value;
