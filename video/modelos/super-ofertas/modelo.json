@@ -17,7 +17,8 @@
   },
   "assina": {
     "src": "assina.mp4",
-    "dur": 5.375
+    "dur": 4.8333,
+    "audio": "assina.mp3"
   },
   "transicao": {
     "frames": 22,
