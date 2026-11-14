@@ -145,6 +145,10 @@
       "base": 1760,
       "maxW": 840,
       "area": 420000
+    },
+    "semClube": {
+      "cor": "#ffffff",
+      "nomeCor": "#ffffff"
     }
   }
 }

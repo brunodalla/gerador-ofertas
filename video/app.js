@@ -53,10 +53,15 @@ async function assets(){
 
 // ---------- produtos ----------
 function itemFalado(it){ return it.falado||FALADO[E.norm(it.name)]||E.nomeFaladoAuto(it.name); }
+// fotos do produto: a principal (it.img) e as outras (it.fotos), por exemplo duas marcas na mesma oferta
+const fotosDe=it=>[it.img,...(it.fotos||[])].filter(Boolean);
+const clearImg=it=>{ for(const k of [...V.imgs.keys()]) if(String(k).startsWith(it.id+':')) V.imgs.delete(k); };
 async function itemImg(it){
-  if(!it.img) return null;
-  if(V.imgs.has(it.id)) return V.imgs.get(it.id);
-  const p=createImageBitmap(it.img).then(trimBitmap).catch(()=>null); V.imgs.set(it.id,p); return p;
+  const fs=fotosDe(it); if(!fs.length) return null;
+  const key=it.id+':'+fs.length;
+  if(V.imgs.has(key)) return V.imgs.get(key);
+  const p=Promise.all(fs.map(f=>createImageBitmap(f).then(trimBitmap).catch(()=>null))).then(a=>{ a=a.filter(Boolean); return a.length>1?a:(a[0]||null); });
+  V.imgs.set(key,p); return p;
 }
 // corta a transparência em volta do produto
 async function trimBitmap(bmp){
@@ -72,6 +77,11 @@ function renderItems(){
   if(!V.job.items.length){ box.append(el('div',{class:'st'},'Nenhum produto ainda. Cole a lista que o cliente mandou em "Colar lista de produtos", traga do Gerador de Ofertas ou adicione um por um em "+ Produto".')); return; }
   V.job.items.forEach((it,i)=>{
     const th=el('div',{class:'th',title:'Trocar a foto',onclick:()=>pickImage(it)});
+    const nf=fotosDe(it).length;
+    const fotoCtl=el('div',{class:'fotoctl'},
+      el('button',{class:'lnk',title:'Pôr mais uma foto (outra marca, outro sabor). Até 3.',disabled:!it.img||nf>=3,onclick:()=>pickImage(it,true)},'+ foto'),
+      nf>1?el('button',{class:'lnk',title:'Tirar a última foto extra',onclick:()=>{ it.fotos=(it.fotos||[]).slice(0,-1); clearImg(it); saveJob(); renderItems(); }},'− foto'):null,
+      nf>1?el('span',{class:'st'},nf+' fotos'):null);
     if(it.img){ th.style.backgroundImage=`url(${URL.createObjectURL(it.img)})`; th.classList.add('has'); }
     const pv=el('canvas',{class:'pv',width:216,height:384,title:'Prévia da oferta (clique para ver maior)',onclick:()=>bigPreview(it)});
     const upd=(k,v)=>{ it[k]=v; E.resetLayouts([it]); saveJob(); say.textContent='🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model); renderSegs(); drawPreview(it,pv); };
@@ -90,7 +100,7 @@ function renderItems(){
     const fal=el('input',{value:itemFalado(it),title:'Como a voz lê o produto',onchange:e=>{ const v=e.target.value.trim(); it.falado=v; if(v&&v!==E.nomeFaladoAuto(it.name)){ FALADO[E.norm(it.name)]=v; } else delete FALADO[E.norm(it.name)]; LS.set(FALADO_KEY,FALADO); upd('falado',v); }});
     const row=el('div',{class:'it'+(it.on?'':' off')},
       el('input',{type:'checkbox',title:'Entra no vídeo',checked:it.on!==false,onchange:e=>{ it.on=e.target.checked; row.classList.toggle('off',!it.on); saveJob(); renderSegs(); }}),
-      th,
+      el('div',{style:'display:grid;gap:4px;justify-items:center'},th,fotoCtl),
       el('div',{style:'display:grid;gap:6px'},
         el('div',{class:'fs'},
           el('label',{class:'f'},'Texto na tela',el('input',{value:it.tela||it.name,onchange:e=>{ const v=e.target.value; if(!it.name||it.name==='PRODUTO'||it.name===it.tela){ it.name=v.toUpperCase(); if(!it.falado) fal.value=itemFalado(it); } upd('tela',v); if(!it.img) autoImage(it).then(ok=>{ if(ok){ saveJob(); renderItems(); } }); }})),
@@ -116,9 +126,9 @@ function drawPreview(it,cv){
   clearTimeout(PVT.get(it.id)); PVT.set(it.id,setTimeout(async()=>{
     try{
       const A=await assets();
-      if(!PVBG){ const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); PVBG=await createImageBitmap(c.canvas); }
+      if(!PVBG||PVBG.id!==V.model.id){ const id=V.model.id; const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); const bmp=await createImageBitmap(c.canvas); if(id===V.model.id) PVBG={id,bmp}; }
       const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d');
-      x.drawImage(PVBG,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
+      x.drawImage(PVBG.bmp,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
       E.drawValidity(x,V.model,V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
       cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
     }catch(e){ console.warn(e); }
@@ -129,12 +139,12 @@ async function bigPreview(it){
 }
 // ---------- fotos: Banco de Produtos, arquivo ou imagem colada ----------
 const IMGMEM_KEY='video.img.v1'; let IMGMEM=LS.get(IMGMEM_KEY,{});
-function setItemImg(it,blob,file){ it.img=blob; V.imgs.delete(it.id); if(file){ IMGMEM[E.norm(it.name)]=file; LS.set(IMGMEM_KEY,IMGMEM); } saveJob(); renderItems(); }
+function setItemImg(it,blob,file){ const add=PICKADD&&it.img; if(add){ it.fotos=[...(it.fotos||[]),blob].slice(0,2); } else it.img=blob; PICKADD=false; clearImg(it); if(file&&!add){ IMGMEM[E.norm(it.name)]=file; LS.set(IMGMEM_KEY,IMGMEM); } saveJob(); renderItems(); }
 async function autoImage(it){
   if(it.img||!BANK.items.length) return false;
   const mem=IMGMEM[E.norm(it.name)]; let f=mem?await bankFile(mem):null;
   if(!f){ const r=bankSearch(it.name,1)[0]; if(r&&r.score>=0.7) f=await r.it.handle.getFile(); }
-  if(f){ it.img=f; V.imgs.delete(it.id); return true; } return false;
+  if(f){ it.img=f; clearImg(it); return true; } return false;
 }
 async function bankStatus(interactive=false){
   const b=$('#btn-bank');
@@ -145,10 +155,10 @@ async function bankStatus(interactive=false){
   }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); }
   return false;
 }
-let PICK=null;
-async function pickImage(it){
-  PICK=it; const d=$('#dlg-img'), q=$('#img-q'), grid=$('#img-grid');
-  $('#img-for').textContent=it.tela||it.name;
+let PICK=null, PICKADD=false;
+async function pickImage(it,add=false){
+  PICK=it; PICKADD=add; const d=$('#dlg-img'), q=$('#img-q'), grid=$('#img-grid');
+  $('#img-for').textContent=(add?'mais uma foto para ':'')+(it.tela||it.name);
   const show=async()=>{
     grid.innerHTML='';
     if(!BANK.items.length){ grid.append(el('div',{class:'st'},'Banco de Produtos não conectado. Toque em "Conectar banco" ou envie um arquivo.')); return; }
@@ -222,7 +232,7 @@ async function fromGenerator(){
   const money=v=>{ const n=E.parseMoney(v); return n==null?'':n.toFixed(2).replace('.',','); };
   const notas=x=>{ const ns=(x.notes&&x.notes.length?x.notes:String(x.note||'').split(' · ')).map(n=>String(n).trim()).filter(Boolean);
     const lim=ns.find(n=>/LIMITE/i.test(n)); const obs=ns.filter(n=>n!==lim&&!/DESTAQUE/i.test(n)); return {limite:lim?E.limiteValor(lim):'',obs:obs.join(' ').toUpperCase()}; };
-  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,on:true,...notas(x)}));
+  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,fotos:(x.imgs||[]).slice(1,3),on:true,...notas(x)}));
   if(h.from) V.job.from=isoDate(h.from); if(h.to) V.job.to=isoDate(h.to)||V.job.from;
   if(!V.job.title&&h.title) V.job.title=h.title;
   V.job.val=E.datasTexto(V.job.from,V.job.to)||V.job.val;
@@ -359,7 +369,7 @@ async function thumbs(){
     const A=await assets(); const {tl,items}=await currentTimeline(); const imgs=await imgsFor(items); E.resetLayouts(items);
     const big=document.createElement('canvas'); big.width=V.model.w; big.height=V.model.h; const ctx=big.getContext('2d');
     for(const p of tl.parts.filter(p=>p.type==='oferta')){
-      await E.drawFrameAt(ctx,tl,V.model,A,imgs,V.job.val,p.start+Math.min(1.6,(p.end-p.start)*0.7));
+      await E.drawFrameAt(ctx,tl,V.model,A,imgs,V.job.val,Math.max(p.start+0.1,Math.min(p.end-0.5,p.start+2.8)));
       const c=document.createElement('canvas'); c.width=360; c.height=640; c.getContext('2d').drawImage(big,0,0,360,640); box.append(c);
     }
     st('st-render','');

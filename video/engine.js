@@ -241,6 +241,7 @@ export function layoutOffer(ctx,it,model){
 // tamanho e posição do produto: cabe numa área de 880x980 em volta do centro (540,1390);
 // it.esc = tamanho (1 = padrão), it.dx/it.dy = deslocamento, it.copias = 1 a 3 (produto repetido lado a lado)
 export function productBoxes(img,it={},L=null,cfg=null){
+  if(Array.isArray(img)) return productBoxesMulti(img,it,L,cfg);
   const ar=img.width/img.height, n=Math.max(1,Math.min(3,it.copias|0||1));
   const step=0.62;                                   // quanto cada cópia anda para o lado (em larguras)
   const spanW=1+(n-1)*step;                          // largura total em larguras de um produto
@@ -255,9 +256,22 @@ export function productBoxes(img,it={},L=null,cfg=null){
     return {i,k:n-1-i,x:cx+ox-bw/2,y:cy+h/2-bh,w:bw,h:bh}; });
   return {cx,cy,boxes};
 }
+// fotos diferentes lado a lado (ex.: duas marcas na mesma oferta), mesma altura, um pouco sobrepostas
+function productBoxesMulti(imgs,it={},L=null,cfg=null){
+  const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};
+  const top=Math.max(C.topo,L&&L.textBottom?L.textBottom+30:C.topo), bot=C.base, boxH=bot-top;
+  const ars=imgs.map(i=>i.width/i.height), ov=0.88;           // cada foto anda 88% da largura da anterior
+  const unitW=ars.reduce((s,a,i)=>s+(i<ars.length-1?a*ov:a),0); // largura total para altura 1
+  let h=Math.min(boxH,C.maxW/unitW,Math.sqrt(C.area*1.25/unitW));
+  h*=it.esc||1;
+  const totalW=unitW*h, cx=C.cx+(it.dx||0), cy=top+boxH/2+(it.dy||0);
+  let x=cx-totalW/2; const n=imgs.length;
+  const boxes=imgs.map((img,i)=>{ const w=ars[i]*h; const b={i,k:n-1-i,img,x,y:cy+h/2-h,w,h}; x+=w*(i<n-1?ov:1); return b; });
+  return {cx,cy,boxes};
+}
 // produto com as cópias entrando uma depois da outra (a da direita primeiro)
 function drawProduct(ctx,img,P,t,copia=0){
-  for(const b of P.boxes){ popAt(ctx,t-b.k*copia,b.x+b.w/2,b.y+b.h/2,()=>ctx.drawImage(img,b.x,b.y,b.w,b.h)); }
+  for(const b of P.boxes){ const im=b.img||img; popAt(ctx,t-b.k*copia,b.x+b.w/2,b.y+b.h/2,()=>ctx.drawImage(im,b.x,b.y,b.w,b.h)); }
 }
 function drawSkewText(ctx,text,x,y,skew=-0.2){ ctx.save(); ctx.translate(x,y); ctx.transform(1,0,skew,1,0,0); ctx.fillText(text,0,0); ctx.restore(); }
 // desenha uma oferta no tempo local lt (segundos desde o corte da transição)
@@ -357,6 +371,23 @@ export function layoutCaixa(ctx,it,model){
   const blockH=cap+(lines.length-1)*lh;
   const top=N.topo!=null?N.topo:N.cy-blockH/2;
   L.nome={z,lines,lh,cap,top,bottom:top+blockH};
+  // sem preço do clube: preço grande branco + nome ao lado (sem a caixa do clube), como nos vídeos sem clube
+  if(!club){
+    const S=Object.assign({cx:579,top:628,h:152,nomeW:320,nomeSize:32,nomeLineH:37,gap:22,nomeDesce:23},C.semClube||{});
+    const Q=clubLayout(ctx,L.boxVal,L.unit,{x:0,y:S.top,w:2000,h:S.h});
+    let nz=S.nomeSize, nl; for(;;){ setF(ctx,F.sb,nz); nl=wrapW(ctx,(it.tela||it.name||'').toUpperCase().replace(/\s+/g,' ').trim(),S.nomeW); if(nl.length<=4||nz<20) break; nz*=0.92; }
+    const nW=Math.max(...nl.map(l=>ctx.measureText(l).width)), ncap=meas(ctx,F.sb,nz,'H').a, nlh=S.nomeLineH*nz/S.nomeSize;
+    const tot=Q.W+S.gap+nW, x0=Math.max(110,S.cx-tot/2), dx=x0-Q.x0;
+    for(const k of ['x0','ix','colX','cx']) Q[k]+=dx;
+    const nh=ncap+(nl.length-1)*nlh;
+    L.sem={Q,nome:{lines:nl,z:nz,lh:nlh,cap:ncap,x:Q.x0+Q.W+S.gap,top:Q.top+S.nomeDesce}};
+    L.sem.nome.bottom=L.sem.nome.top+nh;
+    const lv=limiteValor(it.limite); let yb=Math.max(Q.base,L.sem.nome.bottom);
+    if(lv){ const B=C.limite; L.limite={x:B.x,y:yb+B.abaixo,w:B.w,h:B.h,lines:['LIMITE DE',lv,'POR CLIENTE']}; yb=L.limite.y+L.limite.h; }
+    const ob=obsLinhas(it.obs); if(ob.length){ const B=C.obs; const oy=L.limite?L.limite.y:Math.max(Q.base,L.sem.nome.bottom)+(C.limite.abaixo||30); L.obs={x:B.x,y:oy,w:B.w,h:B.h,lines:ob}; yb=Math.max(yb,oy+B.h); }
+    L.textBottom=yb+10;
+    return L;
+  }
   // preço normal (só quando tem clube)
   const P=C.preco; let y=L.nome.bottom;
   if(L.left!=null){ const p=splitPrice(L.left); let k=1;
@@ -384,7 +415,8 @@ export function drawCaixa(ctx,it,img,L,lt,A,precoLt,model){
   const C=model.caixa, T=model.entra||{}, ink=C.nome.cor;
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   // produto
-  if(img){ const P=productBoxes(img,it,L,C.produto); drawProduct(ctx,img,P,lt-T.produto,T.copia||0); }
+  if(img){ const pc=L.sem?{...C.produto,topo:Math.min(C.produto.topo,L.textBottom+40)}:C.produto; const P=productBoxes(img,it,L,pc); drawProduct(ctx,img,P,lt-T.produto,T.copia||0); }
+  if(L.sem){ drawSemClube(ctx,L,lt,A,precoLt,model); return; }
   // nome
   { const N=L.nome; const cy=(N.top+N.bottom)/2;
     popAt(ctx,lt-T.nome,C.nome.cx,cy,()=>{ ctx.fillStyle=ink; ctx.textAlign='center'; let yy=N.top+N.cap; for(const l of N.lines){ setF(ctx,F.sb,N.z); ctx.fillText(l,C.nome.cx,yy); yy+=N.lh; } ctx.textAlign='left'; }); }
@@ -413,6 +445,23 @@ export function drawCaixa(ctx,it,img,L,lt,A,precoLt,model){
     ctx.restore();
   });
   caixa(L.obs,C.obs,T.obs,T.obsTexto);
+}
+// oferta sem clube no layout "caixa": preço grande + nome ao lado
+function drawSemClube(ctx,L,lt,A,precoLt,model){
+  const C=model.caixa, T=model.entra||{}, Q=L.sem.Q, N=L.sem.nome, cor=C.semClube&&C.semClube.cor||C.clube.cor||'#fff', ncor=C.semClube&&C.semClube.nomeCor||C.nome.cor;
+  let bs=1;
+  if(precoLt!=null&&model.precoPulo) bs=1+(model.precoPulo.escala||0.2)*puloCurva(lt-(precoLt-(model.precoPulo.antes??0.15)));
+  ctx.save(); if(bs!==1){ const gx=Q.x0+Q.W/2, gy=Q.base-Q.H/2; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
+  popAt(ctx,lt-T.preco,Q.x0,Q.base,()=>{ ctx.fillStyle=cor; setF(ctx,F.bk,Q.F*0.267); ctx.fillText('R$',Q.x0,Q.base); setF(ctx,F.bk,Q.F); ctx.fillText(Q.p.int,Q.ix,Q.base);
+    ctx.textAlign='center'; ctx.letterSpacing='0px'; ctx.fillText('.',Q.colX+Q.D.w*0.45,Q.base); ctx.textAlign='left'; });
+  popAt(ctx,lt-(T.preco+0.12),Q.cx,Q.top+Q.C.a,()=>{ ctx.fillStyle=cor; ctx.textAlign='center'; setF(ctx,F.bk,Q.F*0.33); ctx.fillText(Q.p.cents,Q.cx,Q.top+Q.C.a);
+    setF(ctx,F.bk,Q.uz); ctx.fillText(L.unit,Q.cx,Q.top+Q.C.a+Q.F*0.05+Q.U.a); ctx.textAlign='left'; });
+  ctx.restore();
+  popAt(ctx,lt-T.nome,N.x+60,(N.top+N.bottom)/2,()=>{ ctx.fillStyle=ncor; let yy=N.top+N.cap; for(const l of N.lines){ setF(ctx,F.sb,N.z); ctx.fillText(l,N.x,yy); yy+=N.lh; } });
+  const caixa=(B,cfg,tIn,tTxt)=>{ if(!B) return; const cx=B.x+B.w/2, cy=B.y+B.h/2;
+    popAt(ctx,lt-tIn,cx,cy,()=>{ if(cfg.img&&A.img[cfg.img]) ctx.drawImage(A.img[cfg.img],B.x,B.y,B.w,B.h); else rr(ctx,B.x,B.y,B.w,B.h,cfg.r||20,cfg.fill||'#000');
+      popAt(ctx,lt-tTxt,cx,cy,()=>boxLines(ctx,B.lines,F.bk,B.x,B.y,B.w,B.h,cfg.cor)); }); };
+  caixa(L.limite,C.limite,T.limite,T.limiteTexto); caixa(L.obs,C.obs,T.obs,T.obsTexto);
 }
 export function drawValidity(ctx,model,datas){
   if(!datas) return;

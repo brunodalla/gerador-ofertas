@@ -3375,9 +3375,9 @@ async function sendToVideo(){
     for(const g of S.grids){
       const its=g.items.filter(i=>!i.removed&&i.slot).sort((a,b)=>(SLOT_ORDER.indexOf(a.slot)-SLOT_ORDER.indexOf(b.slot))||(a.i-b.i));
       for(const it of (its.length?its:g.items.filter(i=>!i.removed))){
-        let img=null; const id=(it.imgIds||[])[0];
-        if(id){ try{ const c=await getImage(id); if(c){ const cv=document.createElement('canvas'); cv.width=c.width; cv.height=c.height; cv.getContext('2d').drawImage(c,0,0); img=await new Promise(r=>cv.toBlob(r,'image/png')); } }catch(e){ console.warn(e); } }
-        items.push({name:it.name,unit:it.unit||'UND',price:it.price??'',club:it.club??'',notes:it.notes||[],note:it.note||'',img});
+        const imgs=[];
+        for(const id of (it.imgIds||[]).slice(0,3)){ try{ const c=await getImage(id); if(c){ const cv=document.createElement('canvas'); cv.width=c.width; cv.height=c.height; cv.getContext('2d').drawImage(c,0,0); imgs.push(await new Promise(r=>cv.toBlob(r,'image/png'))); } }catch(e){ console.warn(e); } }
+        items.push({name:it.name,unit:it.unit||'UND',price:it.price??'',club:it.club??'',notes:it.notes||[],note:it.note||'',img:imgs[0]||null,imgs});
       }
     }
     await IDB.set('video:handoff',{at:Date.now(),title:S.jobTitle||S.sheetName||'',from:$('#in-from').value,to:$('#in-to').value,items});
