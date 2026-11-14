@@ -41,7 +41,7 @@ async function loadModels(){
 async function setModel(id){
   V.base=`modelos/${id}/`;
   V.model=await (await fetch(V.base+'modelo.json',{cache:'no-cache'})).json();
-  $('#sel-model').value=id; V.A=null; V.assetsP=null;
+  $('#sel-model').value=id; V.A=null; V.assetsP=null; PVBG=null;
   if(V.job) V.job.model=id;
   elStatus();
 }
@@ -73,7 +73,19 @@ function renderItems(){
   V.job.items.forEach((it,i)=>{
     const th=el('div',{class:'th',title:'Trocar a foto',onclick:()=>pickImage(it)});
     if(it.img){ th.style.backgroundImage=`url(${URL.createObjectURL(it.img)})`; th.classList.add('has'); }
-    const upd=(k,v)=>{ it[k]=v; E.resetLayouts([it]); saveJob(); say.textContent='🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model); renderSegs(); };
+    const pv=el('canvas',{class:'pv',width:216,height:384,title:'Prévia da oferta (clique para ver maior)',onclick:()=>bigPreview(it)});
+    const upd=(k,v)=>{ it[k]=v; E.resetLayouts([it]); saveJob(); say.textContent='🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model); renderSegs(); drawPreview(it,pv); };
+    // tamanho, posição e cópias do produto
+    const num=(k,d)=>it[k]==null?d:it[k];
+    const rng=(label,k,min,max,step,d,fmt)=>{ const out=el('span',{class:'st'},fmt(num(k,d)));
+      const inp=el('input',{type:'range',min,max,step,value:num(k,d),oninput:e=>{ it[k]=+e.target.value; out.textContent=fmt(it[k]); drawPreview(it,pv); saveJob(); }});
+      return el('label',{class:'f rg'},el('span',{},label,' ',out),inp); };
+    const ctl=el('div',{class:'ctl'},
+      rng('Tamanho','esc',0.5,2,0.05,1,v=>Math.round(v*100)+'%'),
+      rng('Para cima / baixo','dy',-350,350,5,0,v=>(v>0?'+':'')+v),
+      rng('Para os lados','dx',-300,300,5,0,v=>(v>0?'+':'')+v),
+      el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); drawPreview(it,pv); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' lado a lado'); if((it.copias||1)===n) o.selected=true; return o; }))),
+      el('button',{class:'lnk',onclick:()=>{ delete it.esc; delete it.dx; delete it.dy; delete it.copias; saveJob(); renderItems(); }},'voltar ao padrão'));
     const say=el('div',{class:'say'},'🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model));
     const fal=el('input',{value:itemFalado(it),title:'Como a voz lê o produto',onchange:e=>{ const v=e.target.value.trim(); it.falado=v; if(v&&v!==E.nomeFaladoAuto(it.name)){ FALADO[E.norm(it.name)]=v; } else delete FALADO[E.norm(it.name)]; LS.set(FALADO_KEY,FALADO); upd('falado',v); }});
     const row=el('div',{class:'it'+(it.on?'':' off')},
@@ -86,13 +98,32 @@ function renderItems(){
           el('label',{class:'f'},'Preço clube',el('input',{value:it.club??'',placeholder:'(sem)',onchange:e=>upd('club',e.target.value)})),
           el('label',{class:'f'},'Unidade',el('input',{value:it.unit||'UND',onchange:e=>upd('unit',e.target.value.toUpperCase())})),
           el('label',{class:'f wide'},'Nome falado',fal)),
-        say),
+        say,ctl),
+      pv,
       el('div',{class:'ord'},
         el('button',{title:'Subir',disabled:i===0,onclick:()=>{ V.job.items.splice(i-1,0,V.job.items.splice(i,1)[0]); saveJob(); renderItems(); renderSegs(); }},'▲'),
         el('button',{title:'Descer',disabled:i===V.job.items.length-1,onclick:()=>{ V.job.items.splice(i+1,0,V.job.items.splice(i,1)[0]); saveJob(); renderItems(); renderSegs(); }},'▼'),
         el('button',{title:'Tirar da lista',onclick:()=>{ V.job.items.splice(i,1); saveJob(); renderItems(); renderSegs(); }},'✕')));
     box.append(row);
+    drawPreview(it,pv);
   });
+}
+// prévia de uma oferta parada (tudo já entrou), no fundo do modelo
+let PVBG=null; const PVT=new Map();
+function drawPreview(it,cv){
+  clearTimeout(PVT.get(it.id)); PVT.set(it.id,setTimeout(async()=>{
+    try{
+      const A=await assets();
+      if(!PVBG){ const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); PVBG=await createImageBitmap(c.canvas); }
+      const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d');
+      x.drawImage(PVBG,0,0,W,H); E.resetLayouts([it]); const L=E.layoutOffer(x,it,V.model);
+      E.drawValidity(x,V.model,V.job.val); E.drawOffer(x,it,await itemImg(it),L,5,A);
+      cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
+    }catch(e){ console.warn(e); }
+  },120));
+}
+async function bigPreview(it){
+  const d=$('#dlg-pv'), cv=$('#pv-big'); d.showModal(); drawPreview(it,cv);
 }
 // ---------- fotos: Banco de Produtos, arquivo ou imagem colada ----------
 const IMGMEM_KEY='video.img.v1'; let IMGMEM=LS.get(IMGMEM_KEY,{});

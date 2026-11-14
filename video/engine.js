@@ -229,9 +229,28 @@ export function layoutOffer(ctx,it,model){
   L.old=club&&parseMoney(it.price)?precoTela(parseMoney(it.price)):null;
   if(L.old){ ctx.font=`${ds*0.98}px ${F.old}`; ctx.letterSpacing='0px'; L.oldW=ctx.measureText(L.old).width; L.descW=Math.max(L.descW,L.oldW); }
   L.gap1=23; L.gap2=20;
+  // onde o texto termina (para o "no CLUBE" não encostar na descrição)
+  L.textBottom=top+L.ds*0.72+10+(L.lines.length-1+(L.old?1:0))*L.lineH+L.ds*0.3;
+  L.tagY=Math.max(862,Math.round(L.textBottom+18));
   const W=L.intW+L.gap1+L.colW+L.gap2+L.descW;
   L.x0=Math.max(118,Math.round(540-W/2)); L.top=top;
   return L;
+}
+// tamanho e posição do produto: cabe numa área de 880x980 em volta do centro (540,1390);
+// it.esc = tamanho (1 = padrão), it.dx/it.dy = deslocamento, it.copias = 1 a 3 (produto repetido lado a lado)
+export function productBoxes(img,it={},L=null){
+  const ar=img.width/img.height, n=Math.max(1,Math.min(3,it.copias|0||1));
+  const step=0.62;                                   // quanto cada cópia anda para o lado (em larguras)
+  const spanW=1+(n-1)*step;                          // largura total em larguras de um produto
+  // área livre: do fim do texto (descrição longa empurra para baixo) até 1880
+  const top=Math.max(900,L&&L.textBottom?L.textBottom+30:900), bot=1880, boxH=bot-top;
+  let h=Math.min(boxH,880/(ar*spanW),Math.sqrt(400000/(ar*(n>1?spanW*0.8:1))));
+  h*=it.esc||1; const w=h*ar;
+  const cx=540+(it.dx||0), cy=Math.max(top+Math.min(h,boxH)/2,1390-(980-boxH)/2)+(it.dy||0);
+  const order=n===3?[0,2,1]:[...Array(n).keys()];  // a do meio na frente
+  const boxes=order.map(i=>{ const ox=(i-(n-1)/2)*w*step; const back=n===3&&i!==1?0.92:1; const bw=w*back, bh=h*back;
+    return {x:cx+ox-bw/2,y:cy+h/2-bh-(n>1&&i!==1&&n===3?0:0),w:bw,h:bh}; });
+  return {cx,cy,boxes};
 }
 function drawSkewText(ctx,text,x,y,skew=-0.2){ ctx.save(); ctx.translate(x,y); ctx.transform(1,0,skew,1,0,0); ctx.fillText(text,0,0); ctx.restore(); }
 // desenha uma oferta no tempo local lt (segundos desde o corte da transição)
@@ -240,9 +259,9 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   // produto: cresce com um leve passo além (0,12 → 0,30 s)
   if(img){
-    const ar=img.width/img.height; let h=Math.min(980,880/ar,Math.sqrt(250000/ar)); const w=h*ar;
     const k=easeBack(prog(lt,0.12,0.32),1.6);
-    if(k>0.001){ ctx.save(); ctx.translate(540,1390); ctx.scale(k,k); ctx.drawImage(img,-w/2,-h/2,w,h); ctx.restore(); }
+    if(k>0.001){ const P=productBoxes(img,it,L); ctx.save(); ctx.translate(P.cx,P.cy); ctx.scale(k,k); ctx.translate(-P.cx,-P.cy);
+      for(const b of P.boxes) ctx.drawImage(img,b.x,b.y,b.w,b.h); ctx.restore(); }
   }
   const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
   // quando o locutor fala o preço: o preço cresce um pouco e volta (ênfase)
@@ -270,7 +289,7 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
     ctx.restore(); } }
   // "no CLUBE": chega girando pela direita
   if(L.club&&A.tag){ const q=prog(lt,0.74,0.92); if(q>0){ const e=easeBack(q,1.4), tw=A.tag.width, th=A.tag.height;
-    const cx=598+tw/2, cy=862+th/2;
+    const cx=598+tw/2, cy=(L.tagY||862)+th/2;
     ctx.save(); ctx.globalAlpha=clamp(q*2.5); ctx.translate(cx+(1-e)*420,cy-(1-e)*120); ctx.rotate((1-e)*0.5); ctx.scale(0.6+0.4*e,0.6+0.4*e);
     ctx.drawImage(A.tag,-tw/2,-th/2); ctx.restore(); } }
 }
