@@ -54,7 +54,7 @@
   },
   "tempos": {
     "introVoz": 0.4,
-    "ofertaVoz": 0.25,
+    "ofertaVoz": 0.4,
     "ofertaMin": 2.6,
     "ofertaFolga": 0.35,
     "assinaVoz": 0.6,
@@ -66,8 +66,7 @@
     "linha2": "*IMAGENS MERAMENTE ILUSTRATIVAS"
   },
   "precoPulo": {
-    "escala": 0.22,
-    "dur": 1.25,
-    "antes": 0.1
+    "escala": 0.28,
+    "antes": 0.15
   }
 }

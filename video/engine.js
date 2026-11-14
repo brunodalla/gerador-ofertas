@@ -254,44 +254,56 @@ export function productBoxes(img,it={},L=null){
 }
 function drawSkewText(ctx,text,x,y,skew=-0.2){ ctx.save(); ctx.translate(x,y); ctx.transform(1,0,skew,1,0,0); ctx.fillText(text,0,0); ctx.restore(); }
 // desenha uma oferta no tempo local lt (segundos desde o corte da transição)
+// ---- movimento medido no vídeo de referência (Detona Preço v11, quadro a quadro) ----
+// "pop" com mola: nasce pequeno, passa ~19% do tamanho em 0,18 s, recua ~3,5% e assenta em ~0,5 s
+const SPR={z:0.47,wd:17.5};
+export function spring(t){
+  if(t<=0) return 0;
+  const w=SPR.wd/Math.sqrt(1-SPR.z*SPR.z), a=SPR.z*w;
+  return 1-Math.exp(-a*t)*(Math.cos(SPR.wd*t)+(a/SPR.wd)*Math.sin(SPR.wd*t));
+}
+// quando cada parte entra, em segundos depois do corte da transição (medido no v11)
+export const ENTRA={produto:0.43,inteiro:0.62,centavos:0.78,descricao:0.86,unidade:0.99,selo:1.0};
+// pulo do preço quando o locutor fala: sobe devagar, acelera, segura e volta (curva do v11, pico +28%)
+const PULO=[[0,0],[.04,.03],[.08,.05],[.12,.08],[.17,.24],[.21,.46],[.25,.65],[.29,.76],[.33,.84],[.37,.89],[.42,.95],[.46,.97],[.50,1],[.75,1],[.79,.97],[.87,.97],[.91,.95],[.96,.92],[1.0,.89],[1.04,.84],[1.08,.76],[1.12,.65],[1.16,.51],[1.21,.35],[1.25,.22],[1.29,.14],[1.33,.08],[1.37,.05],[1.42,0]];
+function puloCurva(t){
+  if(t<=0||t>=PULO[PULO.length-1][0]) return 0;
+  for(let i=1;i<PULO.length;i++){ const [t1,v1]=PULO[i]; if(t<=t1){ const [t0,v0]=PULO[i-1]; const u=(t-t0)/(t1-t0); const k=u*u*(3-2*u); return v0+(v1-v0)*k; } }
+  return 0;
+}
+// escala em volta de um ponto (ax,ay), com fade de entrada curtinho
+function popAt(ctx,t,ax,ay,fn){
+  if(t<=0) return; const s=spring(t); if(s<=0.001) return;
+  ctx.save(); ctx.globalAlpha*=clamp(t/0.05); ctx.translate(ax,ay); ctx.scale(s,s); ctx.translate(-ax,-ay); fn(); ctx.restore();
+}
 export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
-  const intB=L.top+270, x0=L.x0;
+  const intB=L.top+270, x0=L.x0, T=ENTRA;
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
-  // produto: cresce com um leve passo além (0,12 → 0,30 s)
-  if(img){
-    const k=easeBack(prog(lt,0.12,0.32),1.6);
-    if(k>0.001){ const P=productBoxes(img,it,L); ctx.save(); ctx.translate(P.cx,P.cy); ctx.scale(k,k); ctx.translate(-P.cx,-P.cy);
-      for(const b of P.boxes) ctx.drawImage(img,b.x,b.y,b.w,b.h); ctx.restore(); }
-  }
+  // produto: pop a partir do centro
+  if(img){ const P=productBoxes(img,it,L); popAt(ctx,lt-T.produto,P.cx,P.cy,()=>{ for(const b of P.boxes) ctx.drawImage(img,b.x,b.y,b.w,b.h); }); }
   const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
-  // quando o locutor fala o preço: o preço cresce um pouco e volta (ênfase)
+  // ênfase quando o locutor fala o preço: cresce a partir do lado esquerdo do preço
   let bs=1;
-  if(precoLt!=null&&pulo){ const u=(lt-(precoLt-pulo.antes))/pulo.dur; if(u>0&&u<1) bs=1+pulo.escala*Math.sin(Math.PI*u)*(u<0.5?1:1); }
+  if(precoLt!=null&&pulo) bs=1+(pulo.escala||0.28)*puloCurva(lt-(precoLt-(pulo.antes??0.15)));
   ctx.save();
-  if(bs!==1){ const gx=x0+(L.intW+L.gap1+L.colW)/2, gy=L.top+135; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
-  // inteiro do preço: entra crescendo
-  { const q=prog(lt,0.30,0.44); if(q>0){ const s=0.35+0.65*easeBack(q,2.2); const cx=x0+L.intW/2, cy=intB-135;
-    ctx.save(); ctx.globalAlpha=clamp(q*3); ctx.translate(cx,cy); ctx.scale(s,s); ctx.translate(-cx,-cy);
-    ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; ctx.fillText(L.p.int,x0,intB);
-    const colX=x0+L.intW+L.gap1; ctx.fillRect(colX-10,intB-53,55,53); ctx.restore(); } }
-  // centavos e unidade: pulam no lugar
-  const pop=(a,b,fn)=>{ const q=prog(lt,a,b); if(q<=0) return; const s=easeBack(q,2); ctx.save(); ctx.globalAlpha=clamp(q*2); fn(s); ctx.restore(); };
-  pop(0.46,0.58,s=>{ const cy=L.top+52; ctx.translate(cX,cy); ctx.scale(s,s); ctx.translate(-cX,-cy); ctx.font=`${L.cSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.p.cents,cX,L.top+100); });
-  pop(0.66,0.78,s=>{ const cy=L.top+152; ctx.translate(cX,cy); ctx.scale(s,s); ctx.translate(-cX,-cy); ctx.font=`${L.uSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.unit,cX,L.top+190); });
+  if(bs!==1){ const gx=x0, gy=L.top+135; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
+  // inteiro + ponto: pop a partir do canto de baixo à esquerda
+  popAt(ctx,lt-T.inteiro,x0,intB,()=>{ ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; ctx.fillText(L.p.int,x0,intB); ctx.fillRect(colX-10,intB-53,55,53); });
+  // centavos e unidade: pop a partir de baixo, no centro
+  popAt(ctx,lt-T.centavos,cX,L.top+100,()=>{ ctx.font=`${L.cSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.p.cents,cX,L.top+100); });
+  popAt(ctx,lt-T.unidade,cX,L.top+190,()=>{ ctx.font=`${L.uSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.unit,cX,L.top+190); });
   ctx.textAlign='left';
   ctx.restore();
-  // descrição e preço antigo: entram deslizando
-  { const q=easeOut(prog(lt,0.56,0.74)); if(q>0){ const dx=(1-q)*40, x=colX+L.colW+L.gap2+dx;
-    ctx.save(); ctx.globalAlpha=q;
-    ctx.font=`${L.ds}px ${F.desc}`; ctx.letterSpacing=(L.ds*0.05)+'px';
-    let y=L.top+L.ds*0.72+10; for(const ln of L.lines){ drawSkewText(ctx,ln,x,y); y+=L.lineH; }
-    if(L.old){ ctx.font=`${L.ds*0.98}px ${F.old}`; ctx.letterSpacing='0px'; drawSkewText(ctx,L.old,x,y+2); }
-    ctx.restore(); } }
-  // "no CLUBE": chega girando pela direita
-  if(L.club&&A.tag){ const q=prog(lt,0.74,0.92); if(q>0){ const e=easeBack(q,1.4), tw=A.tag.width, th=A.tag.height;
-    const cx=598+tw/2, cy=(L.tagY||862)+th/2;
-    ctx.save(); ctx.globalAlpha=clamp(q*2.5); ctx.translate(cx+(1-e)*420,cy-(1-e)*120); ctx.rotate((1-e)*0.5); ctx.scale(0.6+0.4*e,0.6+0.4*e);
-    ctx.drawImage(A.tag,-tw/2,-th/2); ctx.restore(); } }
+  // descrição e preço antigo: pop a partir do centro do bloco
+  { const x=colX+L.colW+L.gap2, cx=x+L.descW/2, cy=(L.top+L.textBottom)/2;
+    popAt(ctx,lt-T.descricao,cx,cy,()=>{
+      ctx.font=`${L.ds}px ${F.desc}`; ctx.letterSpacing=(L.ds*0.05)+'px';
+      let y=L.top+L.ds*0.72+10; for(const ln of L.lines){ drawSkewText(ctx,ln,x,y); y+=L.lineH; }
+      if(L.old){ ctx.font=`${L.ds*0.98}px ${F.old}`; ctx.letterSpacing='0px'; drawSkewText(ctx,L.old,x,y+2); }
+    }); }
+  // "no CLUBE": pop a partir do centro do selo
+  if(L.club&&A.tag){ const tw=A.tag.width, th=A.tag.height, tx=598, ty=L.tagY||862;
+    popAt(ctx,lt-T.selo,tx+tw/2,ty+th/2,()=>ctx.drawImage(A.tag,tx,ty)); }
 }
 export function drawValidity(ctx,model,datas){
   if(!datas) return;
