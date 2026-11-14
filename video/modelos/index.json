@@ -1,3 +1,14 @@
 [
-  { "id": "detona-preco-proner", "nome": "Operação Detona Preço · Proner" }
+  {
+    "id": "detona-preco-proner",
+    "nome": "Operação Detona Preço · Proner"
+  },
+  {
+    "id": "findi-iguatemi",
+    "nome": "Findi Iguatemi"
+  },
+  {
+    "id": "super-ofertas",
+    "nome": "Super Ofertas · Shop Estok"
+  }
 ]

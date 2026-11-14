@@ -8,6 +8,10 @@ export function parseLista(text){
   for(let raw of String(text||'').split(/\r?\n/)){
     let line=raw.replace(/[*_~]/g,' ').replace(/\t+/g,' ; ').replace(/\s+/g,' ').trim();
     if(!line) continue;
+    // "limite de 24 un" e observações entre parênteses viram campos à parte
+    let limite='', obs='';
+    line=line.replace(/[(\-–—,;]?\s*\blimite\s*(?:de\s*)?(\d+\s*[a-zç]*)\s*(?:por\s+cliente)?\)?/i,(m,a)=>{ limite=a.toUpperCase().replace(/^(\d+)\s*(UN|UNID\w*)$/,'$1 UND'); return ' '; }).replace(/\s+/g,' ').trim();
+    line=line.replace(/\((exceto[^)]*|casco[^)]*|sabores[^)]*|nesta embalagem[^)]*)\)/i,(m,a)=>{ obs=a.toUpperCase(); return ' '; }).replace(/\s+/g,' ').trim();
     const prices=[...line.matchAll(MONEY)];
     if(!prices.length) continue;               // títulos, datas e linhas sem preço ficam de fora
     const first=prices[0].index;
@@ -28,7 +32,7 @@ export function parseLista(text){
       .replace(/^[\s\-–—•·*\d.)]+(?=[A-Za-zÀ-ú])/,'').replace(/[\s:;,\-–—|/]+$/,'').trim();
     if(unit==='KG') name=name.replace(/\s*(\/\s*)?\b(kg|o kg)\s*$/i,'').trim();
     if(!name) continue;
-    out.push({name:name.toUpperCase(),price:price===''?'':price.toFixed(2).replace('.',','),club:club===''?'':club.toFixed(2).replace('.',','),unit});
+    out.push({limite,obs,name:name.toUpperCase(),price:price===''?'':price.toFixed(2).replace('.',','),club:club===''?'':club.toFixed(2).replace('.',','),unit});
   }
   return out;
 }

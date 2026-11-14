@@ -1,0 +1,149 @@
+{
+  "id": "super-ofertas",
+  "nome": "Super Ofertas · Shop Estok",
+  "cliente": "Shop Estok",
+  "fps": 30,
+  "w": 1080,
+  "h": 1920,
+  "layout": "caixa",
+  "intro": {
+    "src": "intro.mp4",
+    "dur": 6.5,
+    "audio": "intro.mp3"
+  },
+  "fundo": {
+    "src": "fundo.mp4",
+    "dur": 8.034
+  },
+  "assina": {
+    "src": "assina.mp4",
+    "dur": 5.375
+  },
+  "transicao": {
+    "frames": 22,
+    "fps": 24,
+    "pasta": "tr",
+    "cobre": 10,
+    "audio": "transicao.mp3",
+    "audioDesloc": -0.0833
+  },
+  "trilha": {
+    "src": "trilha.mp3",
+    "inicio": 0.0,
+    "bpm": 114.994,
+    "finalCompasso": 73.17,
+    "para": 102.45,
+    "loopDe": 8.47,
+    "fimArquivo": 104.39,
+    "ganho": 0.18
+  },
+  "voz": {
+    "nome": "Marcio",
+    "stability": 0.5,
+    "similarity_boost": 0.6,
+    "style": 0,
+    "speed": 1.0,
+    "nivel": 0.21
+  },
+  "textos": {
+    "intro": "Vem aproveitar as super ofertas na Shop Estok!",
+    "fim": "Garantia de economia é na Shop Estok!",
+    "oferta": "{nome} {preco}{unidade}{clube}",
+    "falaUnidade": false
+  },
+  "tempos": {
+    "introVoz": 0.4,
+    "ofertaVoz": 0.6,
+    "ofertaMin": 3.0,
+    "ofertaFolga": 0.4,
+    "assinaVoz": 0.4,
+    "fimFolga": 0.25
+  },
+  "precoPulo": {
+    "escala": 0.2,
+    "antes": 0.15
+  },
+  "entra": {
+    "produto": 0.46,
+    "copia": 0.2,
+    "nome": 0.42,
+    "preco": 0.46,
+    "limite": 0.67,
+    "limiteTexto": 0.875,
+    "clube": 1.21,
+    "obs": 1.2,
+    "obsTexto": 1.42,
+    "logo": 1.5,
+    "inteiro": 1.67,
+    "centavos": 1.83
+  },
+  "validade": {
+    "linha1": "OFERTAS VÁLIDAS PARA {datas} OU ENQUANTO DURAREM OS ESTOQUES",
+    "linha2": "*IMAGENS MERAMENTE ILUSTRATIVAS",
+    "cor": "#ffffff"
+  },
+  "caixa": {
+    "nome": {
+      "cx": 325,
+      "cy": null,
+      "topo": 690,
+      "maxW": 345,
+      "size": 31,
+      "lineH": 38,
+      "font": "MontSB",
+      "cor": "#ffffff"
+    },
+    "preco": {
+      "cx": 327,
+      "abaixo": 78,
+      "big": 83,
+      "small": 38,
+      "maxW": 400,
+      "cor": "#ffffff"
+    },
+    "limite": {
+      "x": 185,
+      "abaixo": 40,
+      "w": 247,
+      "h": 170,
+      "img": "lightbox.png",
+      "cor": "#000000"
+    },
+    "clube": {
+      "x": 527,
+      "y": 685,
+      "w": 453,
+      "h": 314,
+      "img": "caixa_laranja.png",
+      "logo": {
+        "img": "clublogo_inv.png",
+        "x": 108,
+        "y": 13,
+        "w": 255,
+        "h": 104
+      },
+      "area": {
+        "x": 28,
+        "y": 133,
+        "w": 405,
+        "h": 150
+      },
+      "cor": "#ffffff"
+    },
+    "obs": {
+      "x": 723,
+      "y": 1030,
+      "w": 247,
+      "h": 165,
+      "img": "lightbox.png",
+      "cor": "#000000"
+    },
+    "produto": {
+      "cx": 540,
+      "topo": 1185,
+      "base": 1760,
+      "maxW": 840,
+      "area": 420000
+    }
+  }
+}

@@ -101,8 +101,10 @@ export function buildTimeline(model,items,voices,music,opts={}){
   let T=snap(aEnd);
   // trilha: depois da intro com áudio próprio ela continua do ponto em que a intro parou (mesma música, sem corte);
   // o final da música cai no fim do vídeo; a sobra (menos de um compasso) vira tempo a mais nas ofertas
-  const mStart=introVideo?parts[0].end:0;
-  const songStart=introVideo?(model.intro.musicaDesde+parts[0].end):model.trilha.inicio;
+  // intro com trilha dentro (Detona): a trilha continua de onde a intro parou. Intro sem trilha: a trilha toca desde o começo, por baixo da intro.
+  const introTemTrilha=introVideo&&model.intro.musicaDesde!=null;
+  const mStart=introTemTrilha?parts[0].end:0;
+  const songStart=introTemTrilha?(model.intro.musicaDesde+parts[0].end):model.trilha.inicio;
   let mus=null;
   if(music){
     mus=planMusic(model.trilha,songStart,T-tm.fimFolga-mStart,mStart);
@@ -122,7 +124,7 @@ export function buildTimeline(model,items,voices,music,opts={}){
   for(const p of parts) if(p.type==='oferta'&&p.voice&&p.voice.preco!=null) p.precoAt=p.voice.at+p.voice.preco;
   // transições: o quadro que cobre a tela cai exatamente no corte entre dois trechos
   const trans=[]; for(let i=1;i<parts.length;i++){ const st=parts[i].start-tr.cobre/trFps; trans.push({cut:parts[i].start,start:st,audioAt:st+(tr.audioDesloc||0)}); }
-  return {parts,T,trans,music:mus,frames:Math.round(T*fps),introVideo,fimVideo};
+  return {parts,T,trans,music:mus,frames:Math.round(T*fps),introVideo:introTemTrilha,fimVideo};
 }
 // pedaços da música (tempo da música → tempo do vídeo), cortes sempre no início de compasso
 export function planMusic(m,songStart,length,offset=0){
@@ -197,7 +199,7 @@ export function wavBlob(buf){
 }
 
 // ---------------- desenho ----------------
-const F={int:'AntonX',desc:'MontR',old:'MontXB',val:'MontR'};
+const F={int:'AntonX',desc:'MontR',old:'MontXB',val:'MontR',bk:'MontBk',sb:'MontSB'};
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const easeOut=t=>1-Math.pow(1-t,3);
 const easeBack=(t,s=1.7)=>{ t=clamp(t)-1; return t*t*((s+1)*t+s)+1; };
@@ -238,19 +240,24 @@ export function layoutOffer(ctx,it,model){
 }
 // tamanho e posição do produto: cabe numa área de 880x980 em volta do centro (540,1390);
 // it.esc = tamanho (1 = padrão), it.dx/it.dy = deslocamento, it.copias = 1 a 3 (produto repetido lado a lado)
-export function productBoxes(img,it={},L=null){
+export function productBoxes(img,it={},L=null,cfg=null){
   const ar=img.width/img.height, n=Math.max(1,Math.min(3,it.copias|0||1));
   const step=0.62;                                   // quanto cada cópia anda para o lado (em larguras)
   const spanW=1+(n-1)*step;                          // largura total em larguras de um produto
-  // área livre: do fim do texto (descrição longa empurra para baixo) até 1880
-  const top=Math.max(900,L&&L.textBottom?L.textBottom+30:900), bot=1880, boxH=bot-top;
-  let h=Math.min(boxH,880/(ar*spanW),Math.sqrt(400000/(ar*(n>1?spanW*0.8:1))));
+  const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};
+  // área livre: do fim do texto (descrição longa empurra para baixo) até a base
+  const top=Math.max(C.topo,L&&L.textBottom?L.textBottom+30:C.topo), bot=C.base, boxH=bot-top;
+  let h=Math.min(boxH,C.maxW/(ar*spanW),Math.sqrt(C.area/(ar*(n>1?spanW*0.8:1))));
   h*=it.esc||1; const w=h*ar;
-  const cx=540+(it.dx||0), cy=Math.max(top+Math.min(h,boxH)/2,1390-(980-boxH)/2)+(it.dy||0);
+  const cx=C.cx+(it.dx||0), cy=top+boxH/2+(it.dy||0);
   const order=n===3?[0,2,1]:[...Array(n).keys()];  // a do meio na frente
   const boxes=order.map(i=>{ const ox=(i-(n-1)/2)*w*step; const back=n===3&&i!==1?0.92:1; const bw=w*back, bh=h*back;
-    return {x:cx+ox-bw/2,y:cy+h/2-bh-(n>1&&i!==1&&n===3?0:0),w:bw,h:bh}; });
+    return {i,k:n-1-i,x:cx+ox-bw/2,y:cy+h/2-bh,w:bw,h:bh}; });
   return {cx,cy,boxes};
+}
+// produto com as cópias entrando uma depois da outra (a da direita primeiro)
+function drawProduct(ctx,img,P,t,copia=0){
+  for(const b of P.boxes){ popAt(ctx,t-b.k*copia,b.x+b.w/2,b.y+b.h/2,()=>ctx.drawImage(img,b.x,b.y,b.w,b.h)); }
 }
 function drawSkewText(ctx,text,x,y,skew=-0.2){ ctx.save(); ctx.translate(x,y); ctx.transform(1,0,skew,1,0,0); ctx.fillText(text,0,0); ctx.restore(); }
 // desenha uma oferta no tempo local lt (segundos desde o corte da transição)
@@ -280,7 +287,7 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
   const intB=L.top+270, x0=L.x0, T=ENTRA;
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   // produto: pop a partir do centro
-  if(img){ const P=productBoxes(img,it,L); popAt(ctx,lt-T.produto,P.cx,P.cy,()=>{ for(const b of P.boxes) ctx.drawImage(img,b.x,b.y,b.w,b.h); }); }
+  if(img){ const P=productBoxes(img,it,L); drawProduct(ctx,img,P,lt-T.produto,0.06); }
   const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
   // ênfase quando o locutor fala o preço: cresce a partir do lado esquerdo do preço
   let bs=1;
@@ -305,10 +312,112 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
   if(L.club&&A.tag){ const tw=A.tag.width, th=A.tag.height, tx=598, ty=L.tagY||862;
     popAt(ctx,lt-T.selo,tx+tw/2,ty+th/2,()=>ctx.drawImage(A.tag,tx,ty)); }
 }
+export function layoutFor(ctx,it,model){ return model.layout==='caixa'?layoutCaixa(ctx,it,model):layoutOffer(ctx,it,model); }
+export function drawFor(ctx,it,img,L,lt,A,precoLt,model){ return model.layout==='caixa'?drawCaixa(ctx,it,img,L,lt,A,precoLt,model):drawOffer(ctx,it,img,L,lt,A,precoLt,model.precoPulo); }
+
+// ---------------- layout "caixa" (Findi Iguatemi, Super Ofertas): nome + preço normal à esquerda, preço do clube numa caixa à direita ----------------
+const TRK=-0.03;   // espaçamento das letras (-30 no Photoshop)
+function setF(ctx,font,size){ ctx.font=`${size}px ${font}`; ctx.letterSpacing=(size*TRK)+'px'; }
+function meas(ctx,font,size,t){ setF(ctx,font,size); const m=ctx.measureText(t); return {w:m.width,a:m.actualBoundingBoxAscent}; }
+function rr(ctx,x,y,w,h,r,c){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fill(); }
+// valor do limite: "24 UND", "5 PACK"... (aceita "LIMITE DE 24UN POR CLIENTE")
+export function limiteValor(s){ s=String(s||'').toUpperCase().replace(/LIMITE\s*(DE)?/,'').replace(/POR\s+CLIENTE/,'').replace(/[()]/g,'').trim(); s=s.replace(/^(\d+)\s*(UN|UNID\w*)\b/,'$1 UND').replace(/^(\d+)([A-Z])/,'$1 $2'); return s; }
+// quebra a observação em até 3 linhas parecidas
+function obsLinhas(s){
+  const w=String(s||'').toUpperCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean); if(!w.length) return [];
+  if(w.length<=3) return w;                                   // EXCETO / ZERO / LACTOSE
+  const last=w[w.length-1], num=/^R?\$?\d/.test(last);         // "... SAI POR 2,79": o número fica sozinho na última linha
+  const rest=num?w.slice(0,-1):w;
+  const n=num?2:Math.min(3,Math.max(2,Math.round(rest.join(' ').length/13)));
+  const per=rest.join(' ').length/n, L=[]; let cur='';
+  for(const x of rest){ if(cur&&(cur.length+1+x.length/2)>per&&L.length<n-1){ L.push(cur); cur=x; } else cur=cur?cur+' '+x:x; }
+  if(cur) L.push(cur); if(num) L.push(last); return L;
+}
+// texto em linhas, cada linha do mesmo comprimento (como nas caixas de limite do Photoshop)
+function boxLines(ctx,lines,font,x,y,w,h,color){
+  const W=w*0.82, maxZ=h*0.44;
+  let sizes=lines.map(l=>{ const m=meas(ctx,font,100,l); return Math.min(100*W/m.w,maxZ); });
+  const cap=meas(ctx,font,100,'H').a/100, gap=h*0.035;
+  let tot=sizes.reduce((s,z)=>s+cap*z,0)+gap*(lines.length-1);
+  if(tot>h*0.8){ const k=h*0.8/tot; sizes=sizes.map(z=>z*k); tot*=k; }
+  let yy=y+(h-tot)/2; ctx.fillStyle=color; ctx.textAlign='center';
+  lines.forEach((l,i)=>{ yy+=cap*sizes[i]; setF(ctx,font,sizes[i]); ctx.fillText(l,x+w/2,yy); yy+=gap; });
+  ctx.textAlign='left';
+}
+function wrapW(ctx,text,maxW){ const words=text.split(/\s+/).filter(Boolean), out=[]; let cur=''; for(const w of words){ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width<=maxW||!cur) cur=t; else { out.push(cur); cur=w; } } if(cur) out.push(cur); return out; }
+export function layoutCaixa(ctx,it,model){
+  const C=model.caixa, L={C};
+  const club=it.club!=null&&it.club!=='';
+  L.club=club; L.boxVal=parseMoney(club?it.club:it.price)||0; L.left=club?parseMoney(it.price):null;
+  L.unit=(it.unit||'UND').toUpperCase().replace(/^UN$|^UNID$/,'UND');
+  // nome
+  const N=C.nome; let z=N.size; let lines;
+  for(;;){ setF(ctx,F.sb,z); lines=wrapW(ctx,(it.tela||it.name||'').toUpperCase().replace(/\s+/g,' ').trim(),N.maxW); if(lines.length<=3||z<18) break; z*=0.92; }
+  const lh=N.lineH*z/N.size, cap=meas(ctx,F.sb,z,'H').a;
+  const blockH=cap+(lines.length-1)*lh;
+  const top=N.topo!=null?N.topo:N.cy-blockH/2;
+  L.nome={z,lines,lh,cap,top,bottom:top+blockH};
+  // preço normal (só quando tem clube)
+  const P=C.preco; let y=L.nome.bottom;
+  if(L.left!=null){ const p=splitPrice(L.left); let k=1;
+    const runs=()=>[[ 'R$ ',P.small*k],[p.int+'.'+p.cents,P.big*k],[' '+L.unit,P.small*k]];
+    const width=()=>runs().reduce((s,[t,zz])=>s+meas(ctx,F.bk,zz,t).w,0);
+    if(width()>P.maxW) k=P.maxW/width();
+    L.preco={runs:runs(),w:width(),base:L.nome.bottom+P.abaixo*(0.85+0.15*k)}; y=L.preco.base; }
+  // limite
+  const lv=limiteValor(it.limite); if(lv){ const B=C.limite; L.limite={x:B.x,y:y+B.abaixo,w:B.w,h:B.h,lines:['LIMITE DE',lv,'POR CLIENTE']}; }
+  const ob=obsLinhas(it.obs); if(ob.length){ const B=C.obs; L.obs={x:B.x,y:B.y,w:B.w,h:B.h,lines:ob}; }
+  // o produto começa abaixo da coluna da esquerda
+  L.textBottom=L.limite?L.limite.y+L.limite.h:y;
+  return L;
+}
+// preço do clube: [R$][INTEIRO][centavos em cima da unidade, a bolinha embaixo] ocupando a área da caixa
+function clubLayout(ctx,value,unit,A){
+  const p=splitPrice(value);
+  const lay=Fz=>{ const rs=meas(ctx,F.bk,Fz*0.267,'R$'), I=meas(ctx,F.bk,Fz,p.int), Cc=meas(ctx,F.bk,Fz*0.33,p.cents), D=meas(ctx,F.bk,Fz,'.'), uz=Fz*0.19*(unit.length>3?0.8:1), U=meas(ctx,F.bk,uz,unit);
+    const colW=Math.max(Cc.w,U.w,D.w*1.1), g=Fz*0.035; return {F:Fz,p,rs,I,C:Cc,D,uz,U,colW,g,W:rs.w+g+I.w+g*0.6+colW,H:I.a}; };
+  let Q=lay(200); Q=lay(Math.min(200*A.w/Q.W,200*A.h/Q.H));
+  Q.x0=A.x+(A.w-Q.W)/2; Q.base=A.y+(A.h+Q.H)/2; Q.top=Q.base-Q.H; Q.ix=Q.x0+Q.rs.w+Q.g; Q.colX=Q.ix+Q.I.w+Q.g*0.6; Q.cx=Q.colX+Q.colW/2;
+  return Q;
+}
+export function drawCaixa(ctx,it,img,L,lt,A,precoLt,model){
+  const C=model.caixa, T=model.entra||{}, ink=C.nome.cor;
+  ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  // produto
+  if(img){ const P=productBoxes(img,it,L,C.produto); drawProduct(ctx,img,P,lt-T.produto,T.copia||0); }
+  // nome
+  { const N=L.nome; const cy=(N.top+N.bottom)/2;
+    popAt(ctx,lt-T.nome,C.nome.cx,cy,()=>{ ctx.fillStyle=ink; ctx.textAlign='center'; let yy=N.top+N.cap; for(const l of N.lines){ setF(ctx,F.sb,N.z); ctx.fillText(l,C.nome.cx,yy); yy+=N.lh; } ctx.textAlign='left'; }); }
+  // preço normal
+  if(L.preco){ const R=L.preco; popAt(ctx,lt-T.preco,C.preco.cx,R.base-20,()=>{ ctx.fillStyle=C.preco.cor; let x=C.preco.cx-R.w/2; for(const [t,z] of R.runs){ setF(ctx,F.bk,z); ctx.fillText(t,x,R.base); x+=ctx.measureText(t).width; } }); }
+  // caixas de limite e observação
+  const caixa=(B,cfg,tIn,tTxt)=>{ if(!B) return; const cx=B.x+B.w/2, cy=B.y+B.h/2;
+    popAt(ctx,lt-tIn,cx,cy,()=>{ if(cfg.img&&A.img[cfg.img]) ctx.drawImage(A.img[cfg.img],B.x,B.y,B.w,B.h); else rr(ctx,B.x,B.y,B.w,B.h,cfg.r||20,cfg.fill||'#000');
+      popAt(ctx,lt-tTxt,cx,cy,()=>boxLines(ctx,B.lines,F.bk,B.x,B.y,B.w,B.h,cfg.cor)); }); };
+  caixa(L.limite,C.limite,T.limite,T.limiteTexto);
+  // caixa do clube
+  const K=C.clube, bx=K.x, by=K.y;
+  let bs=1;
+  if(precoLt!=null&&model.precoPulo) bs=1+(model.precoPulo.escala||0.2)*puloCurva(lt-(precoLt-(model.precoPulo.antes??0.15)));
+  popAt(ctx,lt-T.clube,bx+K.w/2,by+K.h/2,()=>{
+    if(K.img&&A.img[K.img]) ctx.drawImage(A.img[K.img],bx,by,K.w,K.h); else rr(ctx,bx,by,K.w,K.h,K.r||16,K.fill||'#000');
+    if(L.club&&K.logo&&A.img[K.logo.img]){ const g=K.logo; popAt(ctx,lt-T.logo,bx+g.x+g.w/2,by+g.y+g.h/2,()=>ctx.drawImage(A.img[g.img],bx+g.x,by+g.y,g.w,g.h)); }
+    const ar=L.club?K.area:{x:K.area.x,y:K.area.y-60,w:K.area.w,h:K.area.h+50};
+    const Q=clubLayout(ctx,L.boxVal,L.unit,{x:bx+ar.x,y:by+ar.y,w:ar.w,h:ar.h});
+    ctx.save(); if(bs!==1){ const gx=Q.x0+Q.W/2, gy=Q.base-Q.H/2; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
+    ctx.fillStyle=K.cor;
+    popAt(ctx,lt-T.inteiro,Q.x0,Q.base,()=>{ ctx.fillStyle=K.cor; setF(ctx,F.bk,Q.F*0.267); ctx.fillText('R$',Q.x0,Q.base); setF(ctx,F.bk,Q.F); ctx.fillText(Q.p.int,Q.ix,Q.base);
+      ctx.textAlign='center'; setF(ctx,F.bk,Q.F); ctx.letterSpacing='0px'; ctx.fillText('.',Q.colX+Q.D.w*0.45,Q.base); ctx.textAlign='left'; });
+    popAt(ctx,lt-T.centavos,Q.cx,Q.top+Q.C.a,()=>{ ctx.fillStyle=K.cor; ctx.textAlign='center'; setF(ctx,F.bk,Q.F*0.33); ctx.fillText(Q.p.cents,Q.cx,Q.top+Q.C.a);
+      setF(ctx,F.bk,Q.uz); ctx.fillText(L.unit,Q.cx,Q.top+Q.C.a+Q.F*0.05+Q.U.a); ctx.textAlign='left'; });
+    ctx.restore();
+  });
+  caixa(L.obs,C.obs,T.obs,T.obsTexto);
+}
 export function drawValidity(ctx,model,datas){
   if(!datas) return;
   const l1=model.validade.linha1.replace('{datas}',datas), l2=model.validade.linha2;
-  ctx.save(); ctx.fillStyle='#fff'; ctx.translate(0,960); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.save(); ctx.fillStyle=model.validade.cor||'#fff'; ctx.translate(0,960); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
   let fs=17.5; ctx.font=`${fs}px ${F.val}`; ctx.letterSpacing='0.5px'; const w=ctx.measureText(l1).width; if(w>1500){ fs*=1500/w; ctx.font=`${fs}px ${F.val}`; }
   ctx.transform(1,0,-0.2,1,0,0);
   ctx.fillText(l1,0,74); ctx.fillText(l2,0,74+fs*1.15);
@@ -331,6 +440,10 @@ export async function loadAssets(base,model,onStep=()=>{}){
   onStep('transição');
   A.tr=await Promise.all([...Array(model.transicao.frames)].map(async(_,i)=>createImageBitmap(await (await fetch(`${base}${model.transicao.pasta}/${String(i).padStart(2,'0')}.webp`)).blob())));
   if(model.tag) A.tag=await createImageBitmap(await (await fetch(base+model.tag)).blob());
+  // imagens do layout "caixa" (caixa do clube, selo, caixas de limite/observação)
+  A.img={}; const want=new Set();
+  if(model.caixa){ const C=model.caixa; for(const k of ['limite','clube','obs']) if(C[k]&&C[k].img) want.add(C[k].img); if(C.clube&&C.clube.logo) want.add(C.clube.logo.img); }
+  await Promise.all([...want].map(async f=>{ A.img[f]=await createImageBitmap(await (await fetch(base+f)).blob()); }));
   onStep('trilha');
   const aud=async f=>f?decodeAudio(await (await fetch(base+f)).arrayBuffer()):null;
   [A.music,A.clipIntro,A.clipAssina,A.clipTr]=await Promise.all([aud(model.trilha.src),aud(model.intro.audio),aud(model.assina.audio),aud(model.transicao.audio)]);
@@ -351,9 +464,9 @@ export async function drawFrameAt(ctx,tl,model,A,imgs,datas,t){
 const LCACHE=new WeakMap();
 function overlay(ctx,tl,model,A,imgs,datas,t,p){
   if(p.type==='oferta'){
-    let L=LCACHE.get(p.item); if(!L){ L=layoutOffer(ctx,p.item,model); LCACHE.set(p.item,L); }
+    let L=LCACHE.get(p.item); if(!L){ L=layoutFor(ctx,p.item,model); LCACHE.set(p.item,L); }
     drawValidity(ctx,model,datas);
-    drawOffer(ctx,p.item,imgs[p.idx],L,t-p.start,A,p.precoAt!=null?p.precoAt-p.start:null,model.precoPulo);
+    drawFor(ctx,p.item,imgs[p.idx],L,t-p.start,A,p.precoAt!=null?p.precoAt-p.start:null,model);
   }
   const trFps=model.transicao.fps||model.fps;
   for(const tr of tl.trans){ const f=Math.floor((t-tr.start)*trFps+1e-6); if(f>=0&&f<A.tr.length) ctx.drawImage(A.tr[f],0,0,model.w,model.h); }

@@ -36,7 +36,7 @@ function saveJob(){ clearTimeout(saveT); saveT=setTimeout(async()=>{ if(!V.job) 
 async function loadModels(){
   V.models=await (await fetch('modelos/index.json',{cache:'no-cache'})).json();
   const s=$('#sel-model'); s.innerHTML=''; for(const m of V.models) s.append(el('option',{value:m.id},m.nome));
-  s.onchange=()=>setModel(s.value);
+  s.onchange=async()=>{ await setModel(s.value); renderItems(); renderSegs(); };
 }
 async function setModel(id){
   V.base=`modelos/${id}/`;
@@ -97,7 +97,9 @@ function renderItems(){
           el('label',{class:'f'},'Preço normal',el('input',{value:it.price??'',placeholder:'4,99',onchange:e=>upd('price',e.target.value)})),
           el('label',{class:'f'},'Preço clube',el('input',{value:it.club??'',placeholder:'(sem)',onchange:e=>upd('club',e.target.value)})),
           el('label',{class:'f'},'Unidade',el('input',{value:it.unit||'UND',onchange:e=>upd('unit',e.target.value.toUpperCase())})),
-          el('label',{class:'f wide'},'Nome falado',fal)),
+          el('label',{class:'f wide'},'Nome falado',fal),
+          V.model.layout==='caixa'?el('label',{class:'f'},'Limite',el('input',{value:it.limite||'',placeholder:'ex.: 24 UND',title:'Aparece na caixa "LIMITE DE … POR CLIENTE"',onchange:e=>upd('limite',e.target.value.toUpperCase())})):null,
+          V.model.layout==='caixa'?el('label',{class:'f',style:'grid-column:span 3'},'Observação',el('input',{value:it.obs||'',placeholder:'ex.: EXCETO ZERO LACTOSE',onchange:e=>upd('obs',e.target.value.toUpperCase())})):null),
         say,ctl),
       pv,
       el('div',{class:'ord'},
@@ -116,8 +118,8 @@ function drawPreview(it,cv){
       const A=await assets();
       if(!PVBG){ const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); PVBG=await createImageBitmap(c.canvas); }
       const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d');
-      x.drawImage(PVBG,0,0,W,H); E.resetLayouts([it]); const L=E.layoutOffer(x,it,V.model);
-      E.drawValidity(x,V.model,V.job.val); E.drawOffer(x,it,await itemImg(it),L,5,A);
+      x.drawImage(PVBG,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
+      E.drawValidity(x,V.model,V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
       cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
     }catch(e){ console.warn(e); }
   },120));
@@ -172,7 +174,7 @@ function openLista(){
   $('#list-txt').oninput=()=>{ const r=parseLista($('#list-txt').value); $('#list-prev').textContent=r.length?r.map(x=>`• ${x.name} — ${x.club?`R$ ${x.club} clube (normal ${x.price||'—'})`:`R$ ${x.price}`}${x.unit!=='UND'?' '+x.unit:''}`).join('\n'):'Nenhuma linha com preço ainda.'; };
   const go=async replace=>{
     const r=parseLista($('#list-txt').value); if(!r.length){ toast('Não achei preços na lista.','err'); return; }
-    const novos=r.map(x=>({id:newId(),name:x.name,tela:x.name,price:x.price,club:x.club,unit:x.unit,img:null,on:true}));
+    const novos=r.map(x=>({id:newId(),name:x.name,tela:x.name,price:x.price,club:x.club,unit:x.unit,limite:x.limite||'',obs:x.obs||'',img:null,on:true}));
     V.job.items=replace?novos:V.job.items.concat(novos); d.close();
     if(!BANK.items.length) await bankStatus(true);
     let n=0; for(const it of novos) if(await autoImage(it)) n++;
@@ -218,7 +220,9 @@ async function fromGenerator(){
   const chosen=await pickProducts(h);
   if(!chosen) return;
   const money=v=>{ const n=E.parseMoney(v); return n==null?'':n.toFixed(2).replace('.',','); };
-  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,on:true}));
+  const notas=x=>{ const ns=(x.notes&&x.notes.length?x.notes:String(x.note||'').split(' · ')).map(n=>String(n).trim()).filter(Boolean);
+    const lim=ns.find(n=>/LIMITE/i.test(n)); const obs=ns.filter(n=>n!==lim&&!/DESTAQUE/i.test(n)); return {limite:lim?E.limiteValor(lim):'',obs:obs.join(' ').toUpperCase()}; };
+  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,on:true,...notas(x)}));
   if(h.from) V.job.from=isoDate(h.from); if(h.to) V.job.to=isoDate(h.to)||V.job.from;
   if(!V.job.title&&h.title) V.job.title=h.title;
   V.job.val=E.datasTexto(V.job.from,V.job.to)||V.job.val;
