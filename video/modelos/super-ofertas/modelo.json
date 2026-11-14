@@ -148,7 +148,8 @@
     },
     "semClube": {
       "cor": "#ffffff",
-      "nomeCor": "#ffffff"
+      "nomeCor": "#ffffff",
+      "top": 690
     }
   }
 }
