@@ -106,7 +106,11 @@ export function buildTimeline(model,items,voices,music,opts={}){
   const mStart=introTemTrilha?parts[0].end:0;
   const songStart=introTemTrilha?(model.intro.musicaDesde+parts[0].end):model.trilha.inicio;
   let mus=null;
-  if(music){
+  if(music&&model.trilha.ateAssina){
+    // trilha só por baixo das ofertas (Baratão): começa no fim da intro e para no corte da assinatura
+    const fim=parts[parts.length-1].start, len=Math.max(0,fim-mStart);
+    mus={pieces:[{from:songStart,to:Math.min(songStart+len,model.trilha.fimArquivo||1e9),at:mStart,ending:true}],extra:0,stopAt:fim};
+  } else if(music){
     mus=planMusic(model.trilha,songStart,T-tm.fimFolga-mStart,mStart);
     if(mus.extra>0.001){
       const n=parts.filter(p=>p.type==='oferta').length||1;
@@ -161,7 +165,8 @@ export async function mixAudio(tl,A,model,{musicDb=0}={}){
   if(A.music&&tl.music){
     const g=(model.trilha.ganho||0.14)*Math.pow(10,musicDb/20);
     const master=oc.createGain(); master.connect(OUT);
-    master.gain.setValueAtTime(g,0); master.gain.setValueAtTime(g,T-0.3); master.gain.linearRampToValueAtTime(0,T);
+    const mEnd=Math.min(T,tl.music.stopAt??T);
+    master.gain.setValueAtTime(g,0); master.gain.setValueAtTime(g,Math.max(0,mEnd-0.3)); master.gain.linearRampToValueAtTime(0,mEnd);
     const X=0.012;
     tl.music.pieces.forEach((p,i)=>{
       const dur=Math.min(p.to-p.from,T-p.at); if(dur<=0) return;
@@ -216,24 +221,26 @@ export function layoutOffer(ctx,it,model){
   const club=it.club!=null&&it.club!=='';
   const v=parseMoney(club?it.club:it.price)||0, p=splitPrice(v);
   const unit=(it.unit||'UND').toUpperCase().replace(/^UN$|^UNID$/,'UND');
-  const top=600;
-  const L={club,p,unit};
-  L.intSize=270/capRatio(ctx,F.int,'8'); ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; L.intW=ctx.measureText(p.int).width;
-  L.cSize=95/capRatio(ctx,F.int,'8'); ctx.font=`${L.cSize}px ${F.int}`; L.cW=ctx.measureText(p.cents).width;
-  L.uSize=75/capRatio(ctx,F.int,'U'); ctx.font=`${L.uSize}px ${F.int}`; L.uW=ctx.measureText(unit).width;
+  // model.detona: posição e tamanho do bloco de preço em cada modelo com este layout (padrão = Detona Preço)
+  const D=(model&&model.detona)||{}, e=D.escala||1;
+  const top=D.top??600;
+  const L={club,p,unit,e};
+  L.intSize=270*e/capRatio(ctx,F.int,'8'); ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; L.intW=ctx.measureText(p.int).width;
+  L.cSize=95*e/capRatio(ctx,F.int,'8'); ctx.font=`${L.cSize}px ${F.int}`; L.cW=ctx.measureText(p.cents).width;
+  L.uSize=75*e/capRatio(ctx,F.int,'U'); ctx.font=`${L.uSize}px ${F.int}`; L.uW=ctx.measureText(unit).width;
   if(L.uW>L.cW*1.45){ L.uSize*=L.cW*1.45/L.uW; L.uW=L.cW*1.45; }
-  L.colW=Math.max(L.cW,L.uW,60);
+  L.colW=Math.max(L.cW,L.uW,60*e);
   // descrição
   const desc=(it.tela||it.name||'').toUpperCase().replace(/\s+/g,' ').trim();
-  let ds=47, lines; const maxW=380;
+  let ds=47, lines; const maxW=D.descW||380;
   for(;;){ ctx.font=`${ds}px ${F.desc}`; ctx.letterSpacing=(ds*0.05)+'px'; lines=wrap(ctx,desc,maxW); if(lines.length<=(club?4:5)||ds<32) break; ds*=0.92; }
   L.ds=ds; L.lines=lines; L.lineH=ds*1.235; L.descW=Math.max(...lines.map(l=>ctx.measureText(l).width),0);
   L.old=club&&parseMoney(it.price)?precoTela(parseMoney(it.price)):null;
   if(L.old){ ctx.font=`${ds*0.98}px ${F.old}`; ctx.letterSpacing='0px'; L.oldW=ctx.measureText(L.old).width; L.descW=Math.max(L.descW,L.oldW); }
-  L.gap1=23; L.gap2=20;
+  L.gap1=23*e; L.gap2=20;
   // onde o texto termina (para o "no CLUBE" não encostar na descrição)
   L.textBottom=top+L.ds*0.72+10+(L.lines.length-1+(L.old?1:0))*L.lineH+L.ds*0.3;
-  L.tagY=Math.max(862,Math.round(L.textBottom+18));
+  L.tagY=Math.max(D.seloTopo??862,Math.round(L.textBottom+18)); L.tagX=D.seloX??598;
   const W=L.intW+L.gap1+L.colW+L.gap2+L.descW;
   L.x0=Math.max(118,Math.round(540-W/2)); L.top=top;
   return L;
@@ -310,22 +317,39 @@ function popAt(ctx,t,ax,ay,fn){
   if(t<=0) return; const s=spring(t); if(s<=0.001) return;
   ctx.save(); ctx.globalAlpha*=clamp(t/0.05); ctx.translate(ax,ay); ctx.scale(s,s); ctx.translate(-ax,-ay); fn(); ctx.restore();
 }
-export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
-  const intB=L.top+270, x0=L.x0, T=ENTRA;
+// entrada "batida": nasce grande e encolhe até o lugar, com um pequeno rebote (logo e preço do Baratão)
+function slamAt(ctx,t,ax,ay,fn,k=1.1){
+  if(t<=0) return; const s=1+k*(1-spring(t));
+  ctx.save(); ctx.globalAlpha*=clamp(t/0.06); ctx.translate(ax,ay); ctx.scale(s,s); ctx.translate(-ax,-ay); fn(); ctx.restore();
+}
+// bebida alcoólica: selo 18+ (Baratão)
+export const ALCOOL=/\b(cerveja|chopp?|vinho|espumante|vodka|whisky|whiskey|uisque|cachaca|licor|gin|rum|conhaque|tequila|aperitivo|bebida mista|beats)\b/;
+export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null,model=null){
+  const e=L.e||1, intB=L.top+270*e, x0=L.x0, T=model&&model.entra?{...ENTRA,...model.entra}:ENTRA;
+  const D=(model&&model.detona)||{};
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  // logos que entram a cada oferta (ex.: BARATÃO! e Proner)
+  for(const g of D.logos||[]){ const im=A.img&&A.img[g.img]; if(!im) continue;
+    const anim=g.anim==='slam'?slamAt:popAt; anim(ctx,lt-(T[g.entra]??g.entra??0),g.x+g.w/2,g.y+g.h/2,()=>ctx.drawImage(im,g.x,g.y,g.w,g.h)); }
   // produto: pop a partir do centro
-  if(img){ const P=productBoxes(img,it,L); drawProduct(ctx,img,P,lt-T.produto,0.06); }
+  if(img){ const P=productBoxes(img,it,L,D.produto||null); drawProduct(ctx,img,P,lt-T.produto,0.06); }
+  // 18+ nas bebidas alcoólicas
+  const m18=D.mais18; if(m18&&(it.mais18??ALCOOL.test(norm(it.tela||it.name||'')))){
+    popAt(ctx,lt-(T.mais18??T.selo),m18.x,m18.y,()=>{ ctx.save(); ctx.lineWidth=m18.r*0.17; ctx.strokeStyle=m18.cor||'#d7141e';
+      ctx.beginPath(); ctx.arc(m18.x,m18.y,m18.r-ctx.lineWidth/2,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font=`${m18.r*0.95}px MontB`; ctx.letterSpacing='-2px'; ctx.fillText('18+',m18.x,m18.y+m18.r*0.33); ctx.restore(); }); }
   const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
   // ênfase quando o locutor fala o preço: cresce a partir do lado esquerdo do preço
   let bs=1;
   if(precoLt!=null&&pulo) bs=1+(pulo.escala||0.28)*puloCurva(lt-(precoLt-(pulo.antes??0.15)));
   ctx.save();
-  if(bs!==1){ const gx=x0, gy=L.top+135; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
-  // inteiro + ponto: pop a partir do canto de baixo à esquerda
-  popAt(ctx,lt-T.inteiro,x0,intB,()=>{ ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; ctx.fillText(L.p.int,x0,intB); ctx.fillRect(colX-10,intB-53,55,53); });
+  if(bs!==1){ const gx=x0, gy=L.top+135*e; ctx.translate(gx,gy); ctx.scale(bs,bs); ctx.translate(-gx,-gy); }
+  // inteiro + ponto: pop a partir do canto de baixo à esquerda (no Baratão entra "batido", do grande para o lugar)
+  const intIn=D.inteiroBatido?slamAt:popAt, iax=D.inteiroBatido?x0+L.intW/2:x0, iay=D.inteiroBatido?intB-135*e:intB;
+  intIn(ctx,lt-T.inteiro,iax,iay,()=>{ ctx.font=`${L.intSize}px ${F.int}`; ctx.letterSpacing='0px'; ctx.fillText(L.p.int,x0,intB); ctx.fillRect(colX-10*e,intB-53*e,55*e,53*e); });
   // centavos e unidade: pop a partir de baixo, no centro
-  popAt(ctx,lt-T.centavos,cX,L.top+100,()=>{ ctx.font=`${L.cSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.p.cents,cX,L.top+100); });
-  popAt(ctx,lt-T.unidade,cX,L.top+190,()=>{ ctx.font=`${L.uSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.unit,cX,L.top+190); });
+  popAt(ctx,lt-T.centavos,cX,L.top+100*e,()=>{ ctx.font=`${L.cSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.p.cents,cX,L.top+100*e); });
+  popAt(ctx,lt-T.unidade,cX,L.top+190*e,()=>{ ctx.font=`${L.uSize}px ${F.int}`; ctx.textAlign='center'; ctx.fillText(L.unit,cX,L.top+190*e); });
   ctx.textAlign='left';
   ctx.restore();
   // descrição e preço antigo: pop a partir do centro do bloco
@@ -336,11 +360,11 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null){
       if(L.old){ ctx.font=`${L.ds*0.98}px ${F.old}`; ctx.letterSpacing='0px'; drawSkewText(ctx,L.old,x,y+2); }
     }); }
   // "no CLUBE": pop a partir do centro do selo
-  if(L.club&&A.tag){ const tw=A.tag.width, th=A.tag.height, tx=598, ty=L.tagY||862;
-    popAt(ctx,lt-T.selo,tx+tw/2,ty+th/2,()=>ctx.drawImage(A.tag,tx,ty)); }
+  if(L.club&&A.tag){ const se=D.seloEscala||1, tw=A.tag.width*se, th=A.tag.height*se, tx=L.tagX??598, ty=L.tagY||862;
+    popAt(ctx,lt-T.selo,tx+tw/2,ty+th/2,()=>ctx.drawImage(A.tag,tx,ty,tw,th)); }
 }
 export function layoutFor(ctx,it,model){ return model.layout==='caixa'?layoutCaixa(ctx,it,model):layoutOffer(ctx,it,model); }
-export function drawFor(ctx,it,img,L,lt,A,precoLt,model){ return model.layout==='caixa'?drawCaixa(ctx,it,img,L,lt,A,precoLt,model):drawOffer(ctx,it,img,L,lt,A,precoLt,model.precoPulo); }
+export function drawFor(ctx,it,img,L,lt,A,precoLt,model){ return model.layout==='caixa'?drawCaixa(ctx,it,img,L,lt,A,precoLt,model):drawOffer(ctx,it,img,L,lt,A,precoLt,model.precoPulo,model); }
 
 // ---------------- layout "caixa" (Findi Iguatemi, Super Ofertas): nome + preço normal à esquerda, preço do clube numa caixa à direita ----------------
 const TRK=-0.03;   // espaçamento das letras (-30 no Photoshop)
@@ -504,13 +528,14 @@ export async function loadAssets(base,model,onStep=()=>{}){
   if(model.tag) A.tag=await createImageBitmap(await (await fetch(base+model.tag)).blob());
   // imagens do layout "caixa" (caixa do clube, selo, caixas de limite/observação)
   A.img={}; const want=new Set();
+  if(model.detona&&model.detona.logos) for(const g of model.detona.logos) want.add(g.img);
   if(model.caixa){ const C=model.caixa; for(const k of ['limite','clube','obs']) if(C[k]&&C[k].img) want.add(C[k].img); if(C.clube&&C.clube.logo) want.add(C.clube.logo.img); }
   await Promise.all([...want].map(async f=>{ A.img[f]=await createImageBitmap(await (await fetch(base+f)).blob()); }));
   onStep('trilha');
   const aud=async f=>f?decodeAudio(await (await fetch(base+f)).arrayBuffer()):null;
   [A.music,A.clipIntro,A.clipAssina,A.clipTr]=await Promise.all([aud(model.trilha.src),aud(model.intro.audio),aud(model.assina.audio),aud(model.transicao.audio)]);
   A.clips={intro:A.clipIntro,assina:A.clipAssina,tr:A.clipTr};
-  await Promise.all(Object.values(F).map(f=>document.fonts.load(`40px ${f}`)));
+  await Promise.all([...Object.values(F),'MontB'].map(f=>document.fonts.load(`40px ${f}`)));
   return A;
 }
 
