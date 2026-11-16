@@ -232,7 +232,7 @@ export function layoutOffer(ctx,it,model){
   L.colW=Math.max(L.cW,L.uW,60*e);
   // descrição
   const desc=(it.tela||it.name||'').toUpperCase().replace(/\s+/g,' ').trim();
-  let ds=47, lines; const maxW=D.descW||380;
+  let ds=D.descTam||47, lines; const maxW=D.descW||380;
   for(;;){ ctx.font=`${ds}px ${F.desc}`; ctx.letterSpacing=(ds*0.05)+'px'; lines=wrap(ctx,desc,maxW); if(lines.length<=(club?4:5)||ds<32) break; ds*=0.92; }
   L.ds=ds; L.lines=lines; L.lineH=ds*1.235; L.descW=Math.max(...lines.map(l=>ctx.measureText(l).width),0);
   L.old=club&&parseMoney(it.price)?precoTela(parseMoney(it.price)):null;
@@ -242,7 +242,7 @@ export function layoutOffer(ctx,it,model){
   L.textBottom=top+L.ds*0.72+10+(L.lines.length-1+(L.old?1:0))*L.lineH+L.ds*0.3;
   L.tagY=Math.max(D.seloTopo??862,Math.round(L.textBottom+18)); L.tagX=D.seloX??598;
   const W=L.intW+L.gap1+L.colW+L.gap2+L.descW;
-  L.x0=Math.max(118,Math.round(540-W/2)); L.top=top;
+  L.x0=Math.max(118,Math.round((D.cx??540)-W/2)); L.top=top;
   return L;
 }
 // tamanho e posição do produto: cabe numa área de 880x980 em volta do centro (540,1390);
