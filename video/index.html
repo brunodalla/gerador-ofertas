@@ -106,6 +106,10 @@ dialog::backdrop{background:#0009}
       <div style="flex:1;min-width:260px;display:grid;gap:4px"><label class="row st"><input type="checkbox" id="ck-intro"> Abertura: usar o áudio que vem no vídeo da intro (locução, trilha e efeitos)</label><label class="f" id="lb-intro">Abertura (locução gerada) <textarea id="in-intro" rows="2"></textarea></label></div>
       <div style="flex:1;min-width:260px;display:grid;gap:4px"><label class="row st"><input type="checkbox" id="ck-fim"> Final: usar o áudio que vem no vídeo da assinatura</label><label class="f" id="lb-fim">Final (locução gerada) <textarea id="in-fim" rows="2"></textarea></label></div>
     </div>
+    <div class="row" style="margin-top:8px;align-items:flex-end">
+      <label class="f" title="Vai entre colchetes antes de cada frase, como no site do ElevenLabs (funciona nos modelos v3/v4). Deixe vazio para a voz normal.">Tom da locução <input id="in-tag" list="tags-el" style="width:170px" placeholder="sem tom"></label>
+      <datalist id="tags-el"><option value="[excited]"><option value="[animado]"><option value="[enthusiastic]"><option value="[cheerful]"><option value="[shouting]"></datalist>
+    </div>
     <div class="row" style="margin-top:8px">
       <button class="pri" id="btn-tts">Gerar locução</button>
       <span id="st-tts" class="st"></span>

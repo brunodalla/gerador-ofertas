@@ -250,6 +250,8 @@ export function layoutOffer(ctx,it,model){
 export function productBoxes(img,it={},L=null,cfg=null){
   if(Array.isArray(img)) return productBoxesMulti(img,it,L,cfg);
   const ar=img.width/img.height, n=Math.max(1,Math.min(3,it.copias|0||1));
+  // cópias de um produto largo (caixa de bombom): uma em cima da outra, como as fotos diferentes
+  if(n>1&&arranjoDe([img],it)==='pilha') return productBoxesMulti(Array(n).fill(img),it,L,cfg);
   const step=0.62;                                   // quanto cada cópia anda para o lado (em larguras)
   const spanW=1+(n-1)*step;                          // largura total em larguras de um produto
   const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};

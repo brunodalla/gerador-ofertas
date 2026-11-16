@@ -43,7 +43,7 @@ async function setModel(id){
   V.model=await (await fetch(V.base+'modelo.json',{cache:'no-cache'})).json();
   $('#sel-model').value=id; V.A=null; V.assetsP=null; PVBG=null;
   if(V.job) V.job.model=id;
-  elStatus();
+  elStatus(); if($('#in-tag')) $('#in-tag').value=tomTag();
 }
 async function assets(){
   if(V.A) return V.A;
@@ -94,8 +94,8 @@ function renderItems(){
       rng('Tamanho','esc',0.5,2,0.05,1,v=>Math.round(v*100)+'%'),
       rng('Para cima / baixo','dy',-350,350,5,0,v=>(v>0?'+':'')+v),
       rng('Para os lados','dx',-300,300,5,0,v=>(v>0?'+':'')+v),
-      el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); drawPreview(it,pv); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' lado a lado'); if((it.copias||1)===n) o.selected=true; return o; }))),
-      nf>1?el('label',{class:'f'},'Fotos',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado']].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
+      el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); renderItems(); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' cópias'); if((it.copias||1)===n) o.selected=true; return o; }))),
+      (nf>1||(it.copias|0)>1)?el('label',{class:'f'},nf>1?'Fotos':'Arrumar cópias',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado']].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
       el('button',{class:'lnk',onclick:()=>{ delete it.esc; delete it.dx; delete it.dy; delete it.copias; delete it.arranjo; saveJob(); renderItems(); }},'voltar ao padrão'));
     const say=el('div',{class:'say'},'🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model));
     const fal=el('input',{value:itemFalado(it),title:'Como a voz lê o produto',onchange:e=>{ const v=e.target.value.trim(); it.falado=v; if(v&&v!==E.nomeFaladoAuto(it.name)){ FALADO[E.norm(it.name)]=v; } else delete FALADO[E.norm(it.name)]; LS.set(FALADO_KEY,FALADO); upd('falado',v); }});
@@ -298,17 +298,23 @@ async function tts(text,{seed}={}){
 // ---------- locução (trechos) ----------
 const introVideo=()=>!!V.model.intro.audio&&V.job.introVideo!==false;
 const fimVideo=()=>!!V.model.assina.audio&&V.job.fimVideo!==false;
+// tom da locução: tag do ElevenLabs entre colchetes antes de cada frase (ex.: [excited]); padrão animado em todos os modelos
+const tomTag=()=>{ const c=cfg(); let t=(c.tag??V.model.voz.tag??'[excited]').trim(); if(t&&!/^\[.*\]$/.test(t)) t='['+t.replace(/[\[\]]/g,'')+']'; return t; };
+// só os modelos v3/v4 entendem a tag; nos outros ela seria lida em voz alta
+const comTom=t=>{ const g=tomTag(), m=String(cfg().modelId||''); return g&&t&&(!m||/v3|v4/.test(m))?g+' '+t:t; };
 function segList(){
   const its=V.job.items.filter(i=>i.on!==false);
-  return [introVideo()?null:{key:'intro',label:'Abertura',text:V.job.intro.trim()},
-    ...its.map((it,i)=>{ const club=it.club!=null&&it.club!==''; const v=E.parseMoney(club?it.club:it.price); return {key:'o:'+it.id,label:`Oferta ${i+1}`,text:E.fraseOferta({...it,falado:itemFalado(it)},V.model),preco:v!=null?E.precoFalado(v):null}; }),
-    fimVideo()?null:{key:'fim',label:'Final',text:V.job.fim.trim()}].filter(s=>s&&s.text);
+  return [introVideo()?null:{key:'intro',label:'Abertura',text:comTom(V.job.intro.trim())},
+    ...its.map((it,i)=>{ const club=it.club!=null&&it.club!==''; const v=E.parseMoney(club?it.club:it.price); return {key:'o:'+it.id,label:`Oferta ${i+1}`,text:comTom(E.fraseOferta({...it,falado:itemFalado(it)},V.model)),preco:v!=null?E.precoFalado(v):null}; }),
+    fimVideo()?null:{key:'fim',label:'Final',text:comTom(V.job.fim.trim())}].filter(s=>s&&s.text);
 }
 // em que segundo da fala começa o preço (pela marcação do ElevenLabs; sem ela, estimativa pela posição no texto)
 function precoTempo(s,rec){
   if(!s.preco) return null;
   let idx=s.text.indexOf(s.preco); if(idx<0){ const m=/\d/.exec(s.text.slice(Math.max(0,s.text.length-40))); idx=m?s.text.length-40+m.index:-1; } if(idx<0) return null;
   const al=rec.al;
+  // com tag de tom, a marcação pode vir sem os colchetes: procura o preço no texto que o ElevenLabs devolveu
+  if(al&&al.characters){ const txt=al.characters.join(''); const j=txt.lastIndexOf(s.preco); if(j>=0&&al.character_start_times_seconds[j]!=null) return Math.max(0,al.character_start_times_seconds[j]-rec.offset); }
   if(al&&al.character_start_times_seconds&&al.character_start_times_seconds[idx]!=null) return Math.max(0,al.character_start_times_seconds[idx]-rec.offset);
   return rec.buf.duration*idx/s.text.length;
 }
@@ -410,7 +416,7 @@ async function render(){
 }
 
 // ---------- trabalhos ----------
-function fillJobFields(){ $('#in-title').value=V.job.title||''; $('#in-from').value=V.job.from||''; $('#in-to').value=V.job.to||''; $('#in-val').value=V.job.val||''; $('#in-intro').value=V.job.intro||''; $('#in-fim').value=V.job.fim||'';
+function fillJobFields(){ $('#in-title').value=V.job.title||''; $('#in-from').value=V.job.from||''; $('#in-to').value=V.job.to||''; $('#in-val').value=V.job.val||''; $('#in-intro').value=V.job.intro||''; $('#in-tag').value=tomTag(); $('#in-fim').value=V.job.fim||'';
   for(const [ck,lb,on,has] of [['#ck-intro','#lb-intro',introVideo(),!!V.model.intro.audio],['#ck-fim','#lb-fim',fimVideo(),!!V.model.assina.audio]]){ $(ck).checked=on; $(ck).disabled=!has; $(ck).parentElement.hidden=!has; $(lb).hidden=on; }
 }
 async function openJobs(){
@@ -440,6 +446,7 @@ async function init(){
   const dates=()=>{ V.job.from=$('#in-from').value; V.job.to=$('#in-to').value; V.job.val=E.datasTexto(V.job.from,V.job.to); $('#in-val').value=V.job.val; saveJob(); };
   $('#in-from').onchange=dates; $('#in-to').onchange=dates;
   $('#in-val').onchange=e=>{ V.job.val=e.target.value.toUpperCase(); e.target.value=V.job.val; saveJob(); };
+  $('#in-tag').onchange=e=>{ setCfg({tag:e.target.value.trim()}); e.target.value=tomTag(); renderSegs(); };
   $('#in-intro').onchange=e=>{ V.job.intro=e.target.value; setCfg({intro:V.job.intro}); saveJob(); renderSegs(); };
   $('#in-fim').onchange=e=>{ V.job.fim=e.target.value; setCfg({fim:V.job.fim}); saveJob(); renderSegs(); };
   $('#btn-from-gen').onclick=fromGenerator;
