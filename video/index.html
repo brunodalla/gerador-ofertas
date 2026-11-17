@@ -95,6 +95,8 @@ dialog::backdrop{background:#0009}
       <label class="f">Validade de <input id="in-from" type="date"></label>
       <label class="f">até <input id="in-to" type="date"></label>
       <label class="f" style="flex:1;min-width:240px">Texto da validade (lateral) <input id="in-val" placeholder="06 A 08 DE NOVEMBRO"></label>
+      <label class="f" id="box-cham" hidden title="Os dias da abertura e da logo. Cada chamada usa a intro, o fundo e a assinatura renderizados com ela.">Chamada dos dias <select id="in-cham"></select></label>
+      <div id="cham-aviso" class="st warn" hidden style="flex-basis:100%"></div>
     </div>
     <div id="items" class="items"></div>
     <p class="hint">"Nome falado" é como a locução lê o produto (ex.: "Leite condensado Frimesa 395g"). Fica guardado: na próxima vez que o produto aparecer, já vem com o seu texto.</p>

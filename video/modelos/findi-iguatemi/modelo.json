@@ -154,5 +154,9 @@
       "nomeCor": "#111111",
       "top": 700
     }
+  },
+  "chamadas": {
+    "padrao": "sexta a sábado",
+    "opcoes": {}
   }
 }

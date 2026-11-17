@@ -40,10 +40,35 @@ async function loadModels(){
 }
 async function setModel(id){
   V.base=`modelos/${id}/`;
-  V.model=await (await fetch(V.base+'modelo.json',{cache:'no-cache'})).json();
-  $('#sel-model').value=id; V.A=null; V.assetsP=null; PVBG=null;
+  V.modelBase=await (await fetch(V.base+'modelo.json',{cache:'no-cache'})).json();
   if(V.job) V.job.model=id;
+  aplicaChamada(false);
+  $('#sel-model').value=id;
   elStatus(); if($('#in-tag')) $('#in-tag').value=tomTag();
+}
+// chamada dos dias ("sexta a sábado", "quinta a domingo"...): cada modelo pode ter intro, fundo e assinatura
+// renderizados para outras chamadas (modelo.json "chamadas.opcoes"); a escolhida troca esses arquivos
+const normCham=t=>String(t||'').toLowerCase().replace(/[!.]/g,'').replace(/^\s*(de|do)\s+/,'').replace(/\bà\b/g,'a').replace(/\s+/g,' ').trim();
+function chamadasDe(m){ const C=m&&m.chamadas; if(!C) return null; return {padrao:normCham(C.padrao),opcoes:Object.keys(C.opcoes||{}).map(normCham)}; }
+function aplicaChamada(redesenha=true){
+  const B=V.modelBase, C=B.chamadas, want=normCham(V.job&&V.job.chamada);
+  let m=B;
+  if(C&&want&&want!==normCham(C.padrao)){
+    const k=Object.keys(C.opcoes||{}).find(k=>normCham(k)===want);
+    if(k){ const o=C.opcoes[k]; m={...B}; for(const part of ['intro','fundo','assina']) if(o[part]) m[part]={...B[part],...o[part]}; }
+  }
+  V.model=m; V.A=null; V.assetsP=null; PVBG=null; mostraChamada();
+  if(redesenha&&V.job){ renderItems(); }
+}
+function mostraChamada(){
+  const sel=$('#in-cham'), box=$('#box-cham'), aviso=$('#cham-aviso'); if(!sel) return;
+  const C=chamadasDe(V.modelBase);
+  if(!C){ box.hidden=true; return; } box.hidden=false;
+  const want=normCham(V.job&&V.job.chamada)||C.padrao, opts=[C.padrao,...C.opcoes];
+  if(!opts.includes(want)) opts.push(want);
+  sel.innerHTML=''; for(const o of opts){ const op=el('option',{value:o},o+(o===C.padrao?' (padrão)':C.opcoes.includes(o)?'':' — sem vídeo')); if(o===want) op.selected=true; sel.append(op); }
+  const falta=want!==C.padrao&&!C.opcoes.includes(want);
+  aviso.hidden=!falta; if(falta) aviso.textContent=`Ainda não há intro/fundo/assinatura com "${want}" neste modelo: o vídeo sai com "${C.padrao}". Renderize no After e me peça para incluir.`;
 }
 async function assets(){
   if(V.A) return V.A;
@@ -240,6 +265,8 @@ async function fromGenerator(){
     const lim=ns.find(n=>/LIMITE/i.test(n)); const obs=ns.filter(n=>n!==lim&&!/DESTAQUE/i.test(n)); return {limite:lim?E.limiteValor(lim):'',obs:obs.join(' ').toUpperCase()}; };
   V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,fotos:(x.imgs||[]).slice(1,3),on:true,...notas(x)}));
   if(h.from) V.job.from=isoDate(h.from); if(h.to) V.job.to=isoDate(h.to)||V.job.from;
+  // chamada dos dias que o Gerador guardou na arte (ex.: "quinta a sábado"; bebidas "quinta a domingo")
+  { const c=chosen.find(x=>x.dayText); V.job.chamada=c?c.dayText:''; aplicaChamada(false); }
   if(!V.job.title&&h.title) V.job.title=h.title;
   V.job.val=E.datasTexto(V.job.from,V.job.to)||V.job.val;
   V.imgs.clear(); fillJobFields(); renderItems(); renderSegs(); saveJob();
@@ -428,7 +455,7 @@ async function openJobs(){
     el('div',{},el('b',{},j.title||'(sem nome)'),el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.items.length} produtos`)),
     el('div',{class:'row'},el('button',{class:'pri',onclick:async()=>{ await openJob(j); $('#dlg-jobs').close(); }},'Abrir'),el('button',{class:'lnk',onclick:async e=>{ await IDB.del('vjob:'+j.id); e.target.closest('.row').parentElement.remove(); }},'✕'))));
 }
-async function openJob(j){ V.job=j; V.seg.clear(); V.imgs.clear(); if(j.model&&j.model!==V.model.id) await setModel(j.model); fillJobFields(); renderItems(); renderSegs(); }
+async function openJob(j){ V.job=j; V.seg.clear(); V.imgs.clear(); if(j.model&&j.model!==V.model.id) await setModel(j.model); else aplicaChamada(false); fillJobFields(); renderItems(); renderSegs(); }
 
 // ---------- início ----------
 async function init(){
@@ -450,6 +477,7 @@ async function init(){
   $('#in-intro').onchange=e=>{ V.job.intro=e.target.value; setCfg({intro:V.job.intro}); saveJob(); renderSegs(); };
   $('#in-fim').onchange=e=>{ V.job.fim=e.target.value; setCfg({fim:V.job.fim}); saveJob(); renderSegs(); };
   $('#btn-from-gen').onclick=fromGenerator;
+  $('#in-cham').onchange=e=>{ V.job.chamada=e.target.value; saveJob(); aplicaChamada(); };
   $('#ck-intro').onchange=e=>{ V.job.introVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
   $('#ck-fim').onchange=e=>{ V.job.fimVideo=e.target.checked; saveJob(); fillJobFields(); renderSegs(); };
   $('#btn-add').onclick=()=>{ V.job.items.push({id:newId(),name:'PRODUTO',tela:'PRODUTO',price:'',club:'',unit:'UND',img:null,on:true}); saveJob(); renderItems(); renderSegs(); };

@@ -3399,7 +3399,7 @@ async function sendToVideo(){
       for(const it of (its.length?its:g.items.filter(i=>!i.removed))){
         const imgs=[];
         for(const id of (it.imgIds||[]).slice(0,3)){ try{ const c=await getImage(id); if(c){ const cv=document.createElement('canvas'); cv.width=c.width; cv.height=c.height; cv.getContext('2d').drawImage(c,0,0); imgs.push(await new Promise(r=>cv.toBlob(r,'image/png'))); } }catch(e){ console.warn(e); } }
-        items.push({name:it.name,unit:it.unit||'UND',price:it.price??'',club:it.club??'',notes:it.notes||[],note:it.note||'',img:imgs[0]||null,imgs});
+        items.push({name:it.name,unit:it.unit||'UND',price:it.price??'',club:it.club??'',notes:it.notes||[],note:it.note||'',img:imgs[0]||null,imgs,dayText:g.dayText||'',bebidas:!!g.bebidas});
       }
     }
     await IDB.set('video:handoff',{at:Date.now(),title:S.jobTitle||S.sheetName||'',from:$('#in-from').value,to:$('#in-to').value,items});
