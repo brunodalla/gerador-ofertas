@@ -135,7 +135,8 @@ function renderItems(){
           el('label',{class:'f'},'Unidade',el('input',{value:it.unit||'UND',onchange:e=>upd('unit',e.target.value.toUpperCase())})),
           el('label',{class:'f wide'},'Nome falado',fal),
           V.model.layout==='caixa'?el('label',{class:'f'},'Limite',el('input',{value:it.limite||'',placeholder:'ex.: 24 UND',title:'Aparece na caixa "LIMITE DE … POR CLIENTE"',onchange:e=>upd('limite',e.target.value.toUpperCase())})):null,
-          V.model.layout==='caixa'?el('label',{class:'f',style:'grid-column:span 3'},'Observação',el('input',{value:it.obs||'',placeholder:'ex.: EXCETO ZERO LACTOSE',onchange:e=>upd('obs',e.target.value.toUpperCase())})):null),
+          V.model.layout==='caixa'?el('label',{class:'f',style:'grid-column:span 3'},'Observação',el('input',{value:it.obs||'',placeholder:'ex.: EXCETO ZERO LACTOSE',onchange:e=>upd('obs',e.target.value.toUpperCase())})):null,
+          el('label',{class:'f wide',title:'Texto da validade na lateral só desta oferta (ex.: bebidas que valem até domingo). Vazio = a validade geral do vídeo.'},'Validade desta oferta (lateral)',el('input',{value:it.val||'',placeholder:(V.job.val||'')+'  (vazio = a validade geral)',onchange:e=>upd('val',e.target.value.toUpperCase().trim())}))),
         say,ctl),
       pv,
       el('div',{class:'ord'},
@@ -155,7 +156,7 @@ function drawPreview(it,cv){
       if(!PVBG||PVBG.id!==V.model.id){ const id=V.model.id; const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); const bmp=await createImageBitmap(c.canvas); if(id===V.model.id) PVBG={id,bmp}; }
       const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d'); x.imageSmoothingQuality='high';
       x.drawImage(PVBG.bmp,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
-      E.drawValidity(x,V.model,V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
+      E.drawValidity(x,V.model,it.val||V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
       cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
     }catch(e){ console.warn(e); }
   },120));
@@ -263,7 +264,9 @@ async function fromGenerator(){
   const money=v=>{ const n=E.parseMoney(v); return n==null?'':n.toFixed(2).replace('.',','); };
   const notas=x=>{ const ns=(x.notes&&x.notes.length?x.notes:String(x.note||'').split(' · ')).map(n=>String(n).trim()).filter(Boolean);
     const lim=ns.find(n=>/LIMITE/i.test(n)); const obs=ns.filter(n=>n!==lim&&!/DESTAQUE/i.test(n)); return {limite:lim?E.limiteValor(lim):'',obs:obs.join(' ').toUpperCase()}; };
-  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,fotos:(x.imgs||[]).slice(1,3),on:true,...notas(x)}));
+  V.job.items=chosen.map(x=>({id:newId(),name:x.name,tela:x.name,price:money(x.price),club:money(x.club),unit:x.unit||'UND',img:x.img||null,fotos:(x.imgs||[]).slice(1,3),on:true,...notas(x),
+    // validade própria da arte (ex.: bebidas até domingo) quando é diferente da geral
+    ...(x.validity&&x.validity.from&&(x.validity.from!==h.from||x.validity.to!==h.to)?{val:E.datasTexto(isoDate(x.validity.from),isoDate(x.validity.to||x.validity.from))}:{})}));
   if(h.from) V.job.from=isoDate(h.from); if(h.to) V.job.to=isoDate(h.to)||V.job.from;
   // chamada dos dias que o Gerador guardou na arte (ex.: "quinta a sábado"; bebidas "quinta a domingo")
   { const c=chosen.find(x=>x.dayText); V.job.chamada=c?c.dayText:''; aplicaChamada(false); }

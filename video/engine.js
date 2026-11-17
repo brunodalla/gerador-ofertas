@@ -554,7 +554,7 @@ const LCACHE=new WeakMap();
 function overlay(ctx,tl,model,A,imgs,datas,t,p){
   if(p.type==='oferta'){
     let L=LCACHE.get(p.item); if(!L){ L=layoutFor(ctx,p.item,model); LCACHE.set(p.item,L); }
-    drawValidity(ctx,model,datas);
+    drawValidity(ctx,model,p.item.val||datas);
     drawFor(ctx,p.item,imgs[p.idx],L,t-p.start,A,p.precoAt!=null?p.precoAt-p.start:null,model);
   }
   const trFps=model.transicao.fps||model.fps;
