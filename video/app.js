@@ -108,20 +108,28 @@ function renderItems(){
       nf>1?el('button',{class:'lnk',title:'Tirar a última foto extra',onclick:()=>{ it.fotos=(it.fotos||[]).slice(0,-1); clearImg(it); saveJob(); renderItems(); }},'− foto'):null,
       nf>1?el('span',{class:'st'},nf+' fotos'):null);
     if(it.img){ th.style.backgroundImage=`url(${URL.createObjectURL(it.img)})`; th.classList.add('has'); }
-    const pv=el('canvas',{class:'pv',width:216,height:384,title:'Prévia da oferta (clique para ver maior)',onclick:()=>bigPreview(it)});
+    const pv=el('canvas',{class:'pv',width:216,height:384,title:'Arraste a foto ou o preço para mover · Ctrl + rodinha muda o tamanho · clique para ver maior',onclick:()=>{ if(pv._arrastou){ pv._arrastou=false; return; } bigPreview(it); }});
+    arrastaPrevia(pv,it,()=>renderItems());
     const upd=(k,v)=>{ it[k]=v; E.resetLayouts([it]); saveJob(); say.textContent='🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model); renderSegs(); drawPreview(it,pv); };
     // tamanho, posição e cópias do produto
     const num=(k,d)=>it[k]==null?d:it[k];
     const rng=(label,k,min,max,step,d,fmt)=>{ const out=el('span',{class:'st'},fmt(num(k,d)));
       const inp=el('input',{type:'range',min,max,step,value:num(k,d),oninput:e=>{ it[k]=+e.target.value; out.textContent=fmt(it[k]); drawPreview(it,pv); saveJob(); }});
       return el('label',{class:'f rg'},el('span',{},label,' ',out),inp); };
+    const sg=v=>(v>0?'+':'')+v, pc=v=>Math.round(v*100)+'%';
     const ctl=el('div',{class:'ctl'},
-      rng('Tamanho','esc',0.5,2,0.05,1,v=>Math.round(v*100)+'%'),
-      rng('Para cima / baixo','dy',-350,350,5,0,v=>(v>0?'+':'')+v),
-      rng('Para os lados','dx',-300,300,5,0,v=>(v>0?'+':'')+v),
+      el('b',{class:'ctlh'},'Produto'),
+      rng('Tamanho','esc',0.5,2,0.05,1,pc),
+      rng('Para cima / baixo','dy',-350,350,5,0,sg),
+      rng('Para os lados','dx',-300,300,5,0,sg),
       el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); renderItems(); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' cópias'); if((it.copias||1)===n) o.selected=true; return o; }))),
       (nf>1||(it.copias|0)>1)?el('label',{class:'f'},nf>1?'Fotos':'Arrumar cópias',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado']].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
-      el('button',{class:'lnk',onclick:()=>{ delete it.esc; delete it.dx; delete it.dy; delete it.copias; delete it.arranjo; saveJob(); renderItems(); }},'voltar ao padrão'));
+      el('b',{class:'ctlh'},'Preço e texto'),
+      rng('Tamanho','tEsc',0.6,1.6,0.02,1,pc),
+      rng('Para cima / baixo','tDy',-400,400,5,0,sg),
+      rng('Para os lados','tDx',-300,300,5,0,sg),
+      el('button',{class:'lnk',title:'Usa este ajuste do preço e do texto em todas as ofertas do vídeo',onclick:()=>{ for(const o of V.job.items){ o.tEsc=it.tEsc; o.tDx=it.tDx; o.tDy=it.tDy; } saveJob(); renderItems(); toast('Ajuste do preço aplicado em todas as ofertas.'); }},'usar em todas'),
+      el('button',{class:'lnk',onclick:()=>{ for(const k of ['esc','dx','dy','copias','arranjo','tEsc','tDx','tDy']) delete it[k]; saveJob(); renderItems(); }},'voltar ao padrão'));
     const say=el('div',{class:'say'},'🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model));
     const fal=el('input',{value:itemFalado(it),title:'Como a voz lê o produto',onchange:e=>{ const v=e.target.value.trim(); it.falado=v; if(v&&v!==E.nomeFaladoAuto(it.name)){ FALADO[E.norm(it.name)]=v; } else delete FALADO[E.norm(it.name)]; LS.set(FALADO_KEY,FALADO); upd('falado',v); }});
     const row=el('div',{class:'it'+(it.on?'':' off')},
@@ -149,20 +157,43 @@ function renderItems(){
 }
 // prévia de uma oferta parada (tudo já entrou), no fundo do modelo
 let PVBG=null; const PVT=new Map();
-function drawPreview(it,cv){
-  clearTimeout(PVT.get(it.id)); PVT.set(it.id,setTimeout(async()=>{
+function drawPreview(it,cv,rapido=false){
+  const tk=it.id+(cv.id||'');
+  clearTimeout(PVT.get(tk)); PVT.set(tk,setTimeout(async()=>{
     try{
       const A=await assets();
       if(!PVBG||PVBG.id!==V.model.id){ const id=V.model.id; const c=await A.fundo.sink.getCanvas(Math.min(3,A.fundo.dur-0.1)); const bmp=await createImageBitmap(c.canvas); if(id===V.model.id) PVBG={id,bmp}; }
       const W=V.model.w,H=V.model.h; const big=new OffscreenCanvas(W,H), x=big.getContext('2d'); x.imageSmoothingQuality='high';
-      x.drawImage(PVBG.bmp,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model);
+      x.drawImage(PVBG.bmp,0,0,W,H); E.resetLayouts([it]); const L=E.layoutFor(x,it,V.model); cv._L=L; cv._P=E.textoPivo(L,V.model);
       E.drawValidity(x,V.model,it.val||V.job.val); E.drawFor(x,it,await itemImg(it),L,6,A,null,V.model);
       cv.getContext('2d').drawImage(big,0,0,cv.width,cv.height);
     }catch(e){ console.warn(e); }
-  },120));
+  },rapido?16:120));
 }
 async function bigPreview(it){
   const d=$('#dlg-pv'), cv=$('#pv-big'); d.showModal(); drawPreview(it,cv);
+  cv.onclick=()=>{ if(cv._arrastou){ cv._arrastou=false; return; } d.close(); };
+  arrastaPrevia(cv,it,null); d.onclose=()=>{ if(cv._mexeu){ cv._mexeu=false; renderItems(); } };
+}
+// arrastar na prévia: em cima do fim do texto mexe no preço/texto (it.tDx/tDy), embaixo mexe no produto (it.dx/dy)
+// Ctrl + rodinha muda o tamanho do que está embaixo do mouse (it.tEsc / it.esc), como no Gerador de Ofertas
+function alvoPrevia(cv,it,e){
+  const r=cv.getBoundingClientRect(), k=V.model.w/r.width, y=(e.clientY-r.top)*k;
+  const L=cv._L, P=cv._P||{y:600}, s=it.tEsc||1;
+  const fim=L&&L.textBottom!=null?(L.textBottom-P.y)*s+P.y+(it.tDy||0):900;
+  return {alvo:y<fim+15?'t':'p',k};
+}
+function arrastaPrevia(cv,it,depois){
+  let st=null;
+  cv.onpointerdown=e=>{ const {alvo,k}=alvoPrevia(cv,it,e); st={alvo,k,x:e.clientX,y:e.clientY,x0:alvo==='t'?(it.tDx||0):(it.dx||0),y0:alvo==='t'?(it.tDy||0):(it.dy||0),mov:false}; try{ cv.setPointerCapture(e.pointerId); }catch(_){} };
+  cv.onpointermove=e=>{ if(!st){ cv.style.cursor='grab'; return; } const dx=(e.clientX-st.x)*st.k, dy=(e.clientY-st.y)*st.k;
+    if(!st.mov&&Math.abs(e.clientX-st.x)+Math.abs(e.clientY-st.y)<4) return; st.mov=true; cv.style.cursor='grabbing';
+    if(st.alvo==='t'){ it.tDx=Math.round(st.x0+dx); it.tDy=Math.round(st.y0+dy); } else { it.dx=Math.round(st.x0+dx); it.dy=Math.round(st.y0+dy); }
+    drawPreview(it,cv,true); };
+  cv.onpointerup=()=>{ if(!st) return; const m=st.mov; st=null; cv.style.cursor='grab'; if(m){ cv._arrastou=true; cv._mexeu=true; saveJob(); if(depois) depois(); } };
+  cv.onwheel=e=>{ if(!e.ctrlKey) return; e.preventDefault(); const {alvo}=alvoPrevia(cv,it,e), f=e.deltaY<0?1.04:1/1.04;
+    if(alvo==='t') it.tEsc=Math.max(0.6,Math.min(1.6,Math.round((it.tEsc||1)*f*100)/100)); else it.esc=Math.max(0.5,Math.min(2,Math.round((it.esc||1)*f*100)/100));
+    cv._mexeu=true; drawPreview(it,cv,true); saveJob(); clearTimeout(cv._wt); if(depois) cv._wt=setTimeout(depois,600); };
 }
 // ---------- fotos: Banco de Produtos, arquivo ou imagem colada ----------
 const IMGMEM_KEY='video.img.v1'; let IMGMEM=LS.get(IMGMEM_KEY,{});
@@ -261,6 +292,10 @@ async function fromGenerator(){
   if(!h||!h.items||!h.items.length){ toast('Nada para trazer. No Gerador de Ofertas, abra o trabalho e toque em "Gerar vídeo deste trabalho".','err'); return; }
   const chosen=await pickProducts(h);
   if(!chosen) return;
+  // modelo de vídeo certo pelo modelo da arte no Gerador (index.json "gerador": expressão do id do modelo da arte)
+  { const tpl=(chosen.find(x=>x.tpl)||{}).tpl||h.tpl||'';
+    const m=tpl&&(V.models||[]).find(m=>m.gerador&&new RegExp(m.gerador,'i').test(tpl));
+    if(m&&m.id!==V.modelBase.id){ await setModel(m.id); V.job.model=m.id; toast('Modelo de vídeo: '+m.nome); } }
   const money=v=>{ const n=E.parseMoney(v); return n==null?'':n.toFixed(2).replace('.',','); };
   const notas=x=>{ const ns=(x.notes&&x.notes.length?x.notes:String(x.note||'').split(' · ')).map(n=>String(n).trim()).filter(Boolean);
     const lim=ns.find(n=>/LIMITE/i.test(n)); const obs=ns.filter(n=>n!==lim&&!/DESTAQUE/i.test(n)); return {limite:lim?E.limiteValor(lim):'',obs:obs.join(' ').toUpperCase()}; };

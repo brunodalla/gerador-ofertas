@@ -64,6 +64,7 @@ dialog::backdrop{background:#0009}
 .fotoctl{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.fotoctl .lnk{font-size:12px}
 .it .pv{width:108px;height:192px;border-radius:6px;background:#000;cursor:zoom-in}
 .ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.ctlh{flex-basis:100%;font-size:12px;color:var(--mut,#9aa);margin-top:2px}
 .ctl .rg{min-width:150px}.ctl .rg input{width:150px}
 #toasts{position:fixed;right:14px;bottom:14px;display:grid;gap:8px;z-index:50}
 .toast{background:#22262d;border:1px solid #3a404a;border-left:4px solid var(--ok);padding:10px 14px;border-radius:8px;max-width:420px}
@@ -173,7 +174,7 @@ dialog::backdrop{background:#0009}
   <div class="row" style="margin-top:12px;justify-content:flex-end"><button onclick="this.closest('dialog').close()">Fechar</button></div>
 </dialog>
 
-<dialog id="dlg-pv" style="max-width:none;width:fit-content;padding:10px" onclick="this.close()"><canvas id="pv-big" width="540" height="960" style="height:min(86vh,960px);display:block;border-radius:8px"></canvas></dialog>
+<dialog id="dlg-pv" style="max-width:none;width:fit-content;padding:10px" onclick="if(event.target===this)this.close()"><canvas id="pv-big" width="540" height="960" style="height:min(86vh,960px);display:block;border-radius:8px;cursor:grab" title="Arraste a foto ou o preço para mover · Ctrl + rodinha muda o tamanho"></canvas></dialog>
 
 <dialog id="dlg-jobs">
   <h3 style="margin-top:0">Vídeos anteriores</h3>

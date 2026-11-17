@@ -1,22 +1,27 @@
 [
   {
     "id": "detona-preco-proner",
-    "nome": "Operação Detona Preço · Proner"
+    "nome": "Operação Detona Preço · Proner",
+    "gerador": "^(pro|p)_detona"
   },
   {
     "id": "baratao-proner",
-    "nome": "Baratão · Proner"
+    "nome": "Baratão · Proner",
+    "gerador": "^(pro|p)_barat"
   },
   {
     "id": "feirao-proner",
-    "nome": "Feirão · Proner"
+    "nome": "Feirão · Proner",
+    "gerador": "^(pro|p)_verde"
   },
   {
     "id": "findi-iguatemi",
-    "nome": "Findi Iguatemi"
+    "nome": "Findi Iguatemi",
+    "gerador": "^igu_findi"
   },
   {
     "id": "super-ofertas",
-    "nome": "Super Ofertas · Shop Estok"
+    "nome": "Super Ofertas · Shop Estok",
+    "gerador": "^estok_super"
   }
 ]

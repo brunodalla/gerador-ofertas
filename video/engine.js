@@ -330,6 +330,7 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null,model=null){
   const e=L.e||1, intB=L.top+270*e, x0=L.x0, T=model&&model.entra?{...ENTRA,...model.entra}:ENTRA;
   const D=(model&&model.detona)||{};
   ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  if(MODE!=='texto'){
   // logos que entram a cada oferta (ex.: BARATÃO! e Proner)
   for(const g of D.logos||[]){ const im=A.img&&A.img[g.img]; if(!im) continue;
     const anim=g.anim==='slam'?slamAt:popAt; anim(ctx,lt-(T[g.entra]??g.entra??0),g.x+g.w/2,g.y+g.h/2,()=>ctx.drawImage(im,g.x,g.y,g.w,g.h)); }
@@ -340,6 +341,9 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null,model=null){
     popAt(ctx,lt-(T.mais18??T.selo),m18.x,m18.y,()=>{ ctx.save(); ctx.lineWidth=m18.r*0.17; ctx.strokeStyle=m18.cor||'#d7141e';
       ctx.beginPath(); ctx.arc(m18.x,m18.y,m18.r-ctx.lineWidth/2,0,Math.PI*2); ctx.stroke();
       ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font=`${m18.r*0.95}px MontB`; ctx.letterSpacing='-2px'; ctx.fillText('18+',m18.x,m18.y+m18.r*0.33); ctx.restore(); }); }
+  }
+  if(MODE==='produto') return;
+  ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   const colX=x0+L.intW+L.gap1, cX=colX+L.colW/2;
   // ênfase quando o locutor fala o preço: cresce a partir do lado esquerdo do preço
   let bs=1;
@@ -366,7 +370,18 @@ export function drawOffer(ctx,it,img,L,lt,A,precoLt=null,pulo=null,model=null){
     popAt(ctx,lt-T.selo,tx+tw/2,ty+th/2,()=>ctx.drawImage(A.tag,tx,ty,tw,th)); }
 }
 export function layoutFor(ctx,it,model){ return model.layout==='caixa'?layoutCaixa(ctx,it,model):layoutOffer(ctx,it,model); }
-export function drawFor(ctx,it,img,L,lt,A,precoLt,model){ return model.layout==='caixa'?drawCaixa(ctx,it,img,L,lt,A,precoLt,model):drawOffer(ctx,it,img,L,lt,A,precoLt,model.precoPulo,model); }
+// ajuste por oferta do bloco de textos (preço, nome, caixas): it.tEsc (tamanho), it.tDx / it.tDy (posição)
+// o produto não se mexe junto, mas a área livre dele acompanha onde o texto terminou
+let MODE='all';
+export function textoPivo(L,model){ return {x:540,y:L.top??(L.sem&&L.sem.Q&&L.sem.Q.top)??(L.nome&&L.nome.top)??(model.detona&&model.detona.top)??600}; }
+export function drawFor(ctx,it,img,L,lt,A,precoLt,model){
+  const go=(L2,mode)=>{ MODE=mode; try{ return model.layout==='caixa'?drawCaixa(ctx,it,img,L2,lt,A,precoLt,model):drawOffer(ctx,it,img,L2,lt,A,precoLt,model.precoPulo,model); } finally{ MODE='all'; } };
+  const s=it.tEsc||1, dx=it.tDx||0, dy=it.tDy||0;
+  if(s===1&&!dx&&!dy) return go(L,'all');
+  const P=textoPivo(L,model);
+  go(L.textBottom!=null?{...L,textBottom:(L.textBottom-P.y)*s+P.y+dy}:L,'produto');
+  ctx.save(); ctx.translate(P.x+dx,P.y+dy); ctx.scale(s,s); ctx.translate(-P.x,-P.y); go(L,'texto'); ctx.restore();
+}
 
 // ---------------- layout "caixa" (Findi Iguatemi, Super Ofertas): nome + preço normal à esquerda, preço do clube numa caixa à direita ----------------
 const TRK=-0.03;   // espaçamento das letras (-30 no Photoshop)
@@ -454,7 +469,8 @@ export function drawCaixa(ctx,it,img,L,lt,A,precoLt,model){
   const C=model.caixa, T=model.entra||{}, ink=C.nome.cor;
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
   // produto
-  if(img){ const pc=L.sem?{...C.produto,topo:Math.min(C.produto.topo,L.textBottom+40)}:C.produto; const P=productBoxes(img,it,L,pc); drawProduct(ctx,img,P,lt-T.produto,T.copia||0); }
+  if(img&&MODE!=='texto'){ const pc=L.sem?{...C.produto,topo:Math.min(C.produto.topo,L.textBottom+40)}:C.produto; const P=productBoxes(img,it,L,pc); drawProduct(ctx,img,P,lt-T.produto,T.copia||0); }
+  if(MODE==='produto') return;
   if(L.sem){ drawSemClube(ctx,L,lt,A,precoLt,model); return; }
   // nome
   { const N=L.nome; const cy=(N.top+N.bottom)/2;
