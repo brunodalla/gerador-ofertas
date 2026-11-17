@@ -940,7 +940,7 @@ function simplePriceW(ctx,item,k){ const p=fmtPrice(item.price||0); setFont(ctx,
 function fmtPrice(v){ const [i,c]=v.toFixed(2).split('.'); return {int:i,cents:c}; }
 
 // ---------- components ----------
-function drawImageFit(ctx,imgs,box,{valign='center',maxUp=3,iadj=null}={}){
+function drawImageFit(ctx,imgs,box,{valign='center',maxUp=3,iadj=null,rot=0}={}){
   imgs=(imgs||[]).filter(Boolean); if(!imgs.length) return;
   const n=imgs.length, same=n>1&&imgs.every(i=>i===imgs[0]);
   const ov=same?-0.06:0.18;            // overlap (negative = gap) for multiple images
@@ -959,7 +959,13 @@ function drawImageFit(ctx,imgs,box,{valign='center',maxUp=3,iadj=null}={}){
     const a=iadj&&iadj[i]; if(a){ const s=a.s||1; R={x:R.x+R.w*(1-s)/2+(a.x||0),y:R.y+R.h*(1-s)/2+(a.y||0),w:R.w*s,h:R.h*s}; } rects.push(R); }
   const zOf=i=>(iadj&&iadj[i]&&iadj[i].z!=null)?iadj[i].z:-i;
   const order=[...rects.keys()].sort((a,b)=>zOf(a)-zOf(b));
-  for(const i of order){ const R=rects[i]; ctx.drawImage(imgs[i],R.x,R.y,R.w,R.h); }
+  // rotação: do conjunto (em volta do centro do grupo) e de cada imagem (em volta do próprio centro)
+  const g0=rects.length?{x:(Math.min(...rects.map(R=>R.x))+Math.max(...rects.map(R=>R.x+R.w)))/2,y:(Math.min(...rects.map(R=>R.y))+Math.max(...rects.map(R=>R.y+R.h)))/2}:null;
+  for(const i of order){ const R=rects[i]; const ri=(iadj&&iadj[i]&&iadj[i].r)||0;
+    if(!rot&&!ri||!ctx.save){ ctx.drawImage(imgs[i],R.x,R.y,R.w,R.h); continue; }
+    ctx.save(); if(rot){ ctx.translate(g0.x,g0.y); ctx.rotate(rot*Math.PI/180); ctx.translate(-g0.x,-g0.y); }
+    if(ri){ const cx=R.x+R.w/2, cy=R.y+R.h/2; ctx.translate(cx,cy); ctx.rotate(ri*Math.PI/180); ctx.translate(-cx,-cy); }
+    ctx.drawImage(imgs[i],R.x,R.y,R.w,R.h); ctx.restore(); }
   return {x0:Math.min(...rects.map(R=>R.x)), x1:Math.max(...rects.map(R=>R.x+R.w)), y0:Math.min(...rects.map(R=>R.y)), y1:Math.max(...rects.map(R=>R.y+R.h)), rects};
 }
 function imgArea(imgs,box){
@@ -1258,7 +1264,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   const cell={x:c.x,y:c.y,w:c.w,h:c.h};
   const fit=(ims,box)=>{ if(adj&&(adj.s!==1||adj.x||adj.y)){ const s=adj.s||1; box={x:box.x+box.w*(1-s)/2+(adj.x||0),y:box.y+box.h*(1-s)/2+(adj.y||0),w:box.w*s,h:box.h*s}; }
     ctx.save(); ctx.beginPath(); ctx.rect(c.x,c.y,c.w,c.h); ctx.clip();
-    const r=drawImageFit(ctx,(grown||variant==='simpleBig')?fillCopies(ims,box):ims,box,{maxUp:adj&&adj.s>1?3*adj.s:3,iadj:item.iadj});
+    const r=drawImageFit(ctx,(grown||variant==='simpleBig')?fillCopies(ims,box):ims,box,{maxUp:adj&&adj.s>1?3*adj.s:3,iadj:item.iadj,rot:(adj&&adj.r)||0});
     ctx.restore();
     if(r) LHITS.push({k:slot,type:'img',x:r.x0,y:r.y0,w:r.x1-r.x0,h:r.y1-r.y0,rects:r.rects,clip:cell});
     return r; };
@@ -1906,17 +1912,17 @@ function baseOf(im){
   BASE.set(im,b); return b;
 }
 const STUB={drawImage(){},set imageSmoothingQuality(v){}};
-function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null){
+function drawProductImgs(ctx,imgs,bx,shadow,valign='center',iadj=null,shOpt=null,rot=0){
   if(!imgs||!imgs.length) return null;
-  if(!shadow) return drawImageFit(ctx,imgs,bx,{maxUp:4,valign,iadj});
+  if(!shadow) return drawImageFit(ctx,imgs,bx,{maxUp:4,valign,iadj,rot});
   imgs=imgs.filter(Boolean); if(!imgs.length) return null;
   // layout first (no drawing), then work only inside the products' own area: much faster than full-size layers
   const L=drawImageFit(STUB,imgs,bx,{maxUp:4,valign,iadj}); if(!L) return null;
   const rects=L.rects||[{x:L.x0,y:L.y0,w:L.x1-L.x0,h:L.y1-L.y0}];
-  const M=Math.round(70+0.3*Math.max(...rects.map(R=>R.h))), ox=Math.floor(Math.min(...rects.map(R=>R.x))-M), oy=Math.floor(Math.min(...rects.map(R=>R.y))-M);
+  const turned=rot||(iadj||[]).some(q=>q&&q.r); const M=Math.round(70+0.3*Math.max(...rects.map(R=>R.h))+(turned?0.5*Math.max(...rects.map(R=>Math.max(R.w,R.h))):0)), ox=Math.floor(Math.min(...rects.map(R=>R.x))-M), oy=Math.floor(Math.min(...rects.map(R=>R.y))-M);
   const W=Math.ceil(Math.max(...rects.map(R=>R.x+R.w))+M)-ox, H=Math.ceil(Math.max(...rects.map(R=>R.y+R.h))+M)-oy;
   const c=document.createElement('canvas'); c.width=Math.max(1,W); c.height=Math.max(1,H); const x=c.getContext('2d');
-  x.translate(-ox,-oy); drawImageFit(x,imgs,bx,{maxUp:4,valign,iadj});
+  x.translate(-ox,-oy); drawImageFit(x,imgs,bx,{maxUp:4,valign,iadj,rot});
   // shadows are built at 1/3 resolution and scaled up (blur is the slow part; at low resolution it is ~10x faster)
   const K=3, sw=Math.ceil(c.width/K), shh=Math.ceil(c.height/K);
   const sil=document.createElement('canvas'); sil.width=sw; sil.height=shh; const sx=sil.getContext('2d');
@@ -2057,7 +2063,7 @@ function drawGridCell(ctx,A,T,cell,item,imgs,ss,k){
   const areaOf=b=>{ const f=fitRect(imgs,b); if(!f) return 0; const ov=Math.max(0,Math.min(f.x+f.w,ex1)-Math.max(f.x,ex0))*Math.max(0,Math.min(f.y+f.h,ey1)-Math.max(f.y,ey0)); return f.w*f.h-ov*12; };
   let best=null, bv=-1e9; cands.forEach((b,i)=>{ const v=areaOf(b)*(i===0?1.1:1); if(v>bv){ bv=v; best=b; } });
   ctx.save(); ctx.beginPath(); ctx.rect(cell.x,cell.y,cell.w,cell.h); ctx.clip();
-  const dr=best?drawProductImgs(ctx,imgs,adjBox(best,item.adj),false,'bottom',item.iadj):null;
+  const dr=best?drawProductImgs(ctx,imgs,adjBox(best,item.adj),false,'bottom',item.iadj,null,(item.adj&&item.adj.r)||0):null;
   BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; stampHlts(ctx,A,item,k,gm.w,cell);
   if(dr) HITS.push({k,type:'img',x:dr.x0,y:dr.y0,w:dr.x1-dr.x0,h:dr.y1-dr.y0,rects:dr.rects,clip:cell});
   HITS.push({k,type:'price',x:ex0,y:ey0,w:gm.w,h:gm.h});
@@ -2136,7 +2142,7 @@ function renderCapa(ctx,A,T,Z,entries,bd){
   const all=[...back,...front];
   // products are drawn on a layer first so the darker "floor" of the backdrop can rise behind them
   const pl=document.createElement('canvas'); pl.width=ctx.canvas.width; pl.height=ctx.canvas.height; const px=pl.getContext('2d');
-  const drawn=back.map(q=>drawProductImgs(px,q.imgs,q.box,true,'bottom',q.it.iadj,q.it.sh));
+  const drawn=back.map(q=>drawProductImgs(px,q.imgs,q.box,true,'bottom',q.it.iadj,q.it.sh,(q.it.adj&&q.it.adj.r)||0));
   if(bd&&bd.floor&&A['bg_'+bd.id]&&back.length){
     const mids=[]; drawn.forEach(r=>{ if(r) (r.rects||[{y:r.y0,h:r.y1-r.y0}]).forEach(R=>mids.push(R.y+R.h*0.5)); });
     let f=mids.length?Math.min(...mids):bd.floor; f=Math.max(Z[1]+ZH*0.12,f);
@@ -2144,7 +2150,7 @@ function renderCapa(ctx,A,T,Z,entries,bd){
       ctx.drawImage(im,0,bd.floor+E,bd.W,K,0,f+E,bd.W,bd.floor+E+K-(f+E));
       ctx.drawImage(im,0,bd.floor-E,bd.W,2*E,0,f-E,bd.W,2*E); } }
   ctx.drawImage(pl,0,0);
-  for(const q of front) q._dr=drawProductImgs(ctx,q.imgs,q.box,true,'bottom',q.it.iadj,q.it.sh);
+  for(const q of front) q._dr=drawProductImgs(ctx,q.imgs,q.box,true,'bottom',q.it.iadj,q.it.sh,(q.it.adj&&q.it.adj.r)||0);
   const bgc=(()=>{ const im=bd&&A['bg_'+bd.id]; if(!im) return ctx; if(!renderCapa.cache||renderCapa.cache.id!==bd.id){ const c=document.createElement('canvas'); c.width=bd.W; c.height=bd.H; const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(im,0,0,bd.W,bd.H); renderCapa.cache={id:bd.id,x}; } return renderCapa.cache.x; })();
   const lumAt=(x,y,w,h)=>{ try{ const d=bgc.getImageData(Math.max(0,Math.round(x)),Math.max(0,Math.round(y)),Math.max(1,Math.round(w)),Math.max(1,Math.round(h))).data; let t=0,c=0; for(let i=0;i<d.length;i+=16){ t+=d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11; c++; } return c?t/c:null; }catch(e){ return null; } };
   const off=q=>[(q.it.adj&&q.it.adj.px)||0,(q.it.adj&&q.it.adj.py)||0];
@@ -3740,7 +3746,7 @@ function buildGridUI(){
         el('button',{class:'btn pri',onclick:()=>downloadGrid(gi)},'Baixar PNG'),
         el('button',{class:'btn del',title:'Excluir esta arte (ela some da lista e não é salva nem exportada)',onclick:()=>deleteGrid(gi)},'🗑 Excluir arte')),
       el('div',{class:'gb'},
-        el('div',{class:'pv'},previewCanvas(gi),el('div',{class:'hint'},document.body.classList.contains('mobile')?'arraste a foto, o preço ou o limite com o dedo · dois dedos mudam o tamanho · toque para ampliar':'arraste a foto, o preço ou o limite para mover · Ctrl + rodinha muda o tamanho · clique para ampliar')),
+        el('div',{class:'pv'},previewCanvas(gi),el('div',{class:'hint'},document.body.classList.contains('mobile')?'arraste a foto, o preço ou o limite com o dedo · dois dedos mudam o tamanho · toque para ampliar':'arraste a foto, o preço ou o limite para mover · Ctrl + rodinha muda o tamanho · Alt + rodinha gira a foto · clique para ampliar')),
         el('div',{class:'rows',id:'rows-'+gi})));
     root.append(card); buildRows(gi);
   });
@@ -3788,7 +3794,13 @@ function previewCanvas(gi){
     else if(s0.it){ buildRows(gi); setActiveRow(gi,s0.it); const r=$(`#row-${gi}-${s0.it.i}`); if(r) r.scrollIntoView({block:'nearest',behavior:'smooth'}); }
     else if(ev.type==='pointerup') openZoom(gi); };
   c.addEventListener('pointerup',end); c.addEventListener('pointercancel',ev=>{ P.delete(ev.pointerId); st=null; });
-  c.addEventListener('wheel',ev=>{ if(!ev.ctrlKey) return; const [x,y]=pt(ev); const h=hitAt(x,y); const it=itemOf(h); if(!it) return; ev.preventDefault();
+  c.addEventListener('wheel',ev=>{
+    if(ev.altKey&&!ev.ctrlKey){ const [x,y]=pt(ev); const h=hitAt(x,y); const it=itemOf(h); if(!it||!h||h.type!=='img') return; ev.preventDefault();
+      const d=ev.deltaY<0?-2:2, n=(it.imgIds||[]).length, sel=n>1?(it.adjSel??-1):-1; const wrap=v=>((v+180)%360+360)%360-180;
+      if(sel>=0){ it.iadj=[...(it.iadj||[])]; while(it.iadj.length<n) it.iadj.push(null); const a=it.iadj[sel]||{s:1,x:0,y:0}; it.iadj[sel]={...a,r:wrap((a.r||0)+d)}; }
+      else { const a=it.adj||{s:1,x:0,y:0}; it.adj={s:1,x:0,y:0,...a,r:wrap((a.r||0)+d)}; }
+      renderSoon(gi); clearTimeout(c._wt); c._wt=setTimeout(()=>buildRows(gi),400); return; }
+    if(!ev.ctrlKey) return; const [x,y]=pt(ev); const h=hitAt(x,y); const it=itemOf(h); if(!it) return; ev.preventDefault();
     const f=ev.deltaY<0?1.02:1/1.02; setS(h,it,sOf(h,it)*f);
     renderSoon(gi); clearTimeout(c._wt); c._wt=setTimeout(()=>buildRows(gi),400); },{passive:false});
   return c;
@@ -3909,15 +3921,15 @@ function imgAdjUI(gi,it){
   const n=(it.imgIds||[]).length; const k=n>1?(it.adjSel??-1):-1;      // -1 = all images together
   const cur=()=>k<0?(it.adj||{s:1,x:0,y:0}):((it.iadj||[])[k]||{s:1,x:0,y:0});
   const set=(key,v)=>{ if(k<0) it.adj={...(it.adj||{s:1,x:0,y:0}),[key]:v}; else { it.iadj=[...(it.iadj||[])]; while(it.iadj.length<n) it.iadj.push(null); it.iadj[k]={s:1,x:0,y:0,...(it.iadj[k]||{}),[key]:v}; } renderSoon(gi); lab.textContent=fmt(); };
-  const fmt=()=>{ const b=cur(); return `${Math.round((b.s||1)*100)}% · X ${b.x||0} · Y ${b.y||0}`; };
+  const fmt=()=>{ const b=cur(); return `${Math.round((b.s||1)*100)}% · X ${b.x||0} · Y ${b.y||0}`+(b.r?` · ${b.r}°`:''); };
   const lab=el('span',{class:'adjv'},fmt());
   const a=cur();
-  const rng=(key,min,max,step,val)=>fine(min,max,step,val,v=>set(key,v),key==='s'?'Tamanho da foto':key==='x'?'Mover para os lados':'Mover para cima/baixo',key==='s');
+  const rng=(key,min,max,step,val)=>fine(min,max,step,val,v=>set(key,v),key==='s'?'Tamanho da foto':key==='x'?'Mover para os lados':key==='r'?'Girar a foto (graus)':'Mover para cima/baixo',key==='s');
   const sel=n>1?el('select',{class:'gsel',title:'Qual imagem ajustar',onchange:e=>{ it.adjSel=+e.target.value; buildRows(gi); }},
       el('option',{value:-1,selected:k<0},'todas as imagens'),...Array.from({length:n},(_,i)=>el('option',{value:i,selected:k===i},`imagem ${i+1}`))):null;
   const front=(n>1&&k>=0)?el('button',{class:'lnk',title:'Passar esta imagem para a frente das outras',onclick:()=>{ const zs=(it.iadj||[]).map((q,i)=>q&&q.z!=null?q.z:-i); set('z',Math.max(0,...zs)+1); }},'trazer para frente'):null;
-  const reset=el('button',{class:'lnk',onclick:()=>{ if(k<0){ if(it.adj){ it.adj.s=1; it.adj.x=0; it.adj.y=0; } } else if(it.iadj) it.iadj[k]=null; buildRows(gi); renderSoon(gi); }},'↺');
-  return el('div',{class:'adj'},el('b',{},'Foto:'),sel,' tamanho ',rng('s',0.3,3,0.02,a.s||1),' X ',rng('x',-900,900,2,a.x||0),' Y ',rng('y',-1200,1200,2,a.y||0),lab,front,reset);
+  const reset=el('button',{class:'lnk',onclick:()=>{ if(k<0){ if(it.adj){ it.adj.s=1; it.adj.x=0; it.adj.y=0; delete it.adj.r; } } else if(it.iadj) it.iadj[k]=null; buildRows(gi); renderSoon(gi); }},'↺');
+  return el('div',{class:'adj'},el('b',{},'Foto:'),sel,' tamanho ',rng('s',0.3,3,0.02,a.s||1),' X ',rng('x',-900,900,2,a.x||0),' Y ',rng('y',-1200,1200,2,a.y||0),' girar ',rng('r',-180,180,1,a.r||0),lab,front,reset);
 }
 function shadowAdjUI(gi,it){
   const g=S.grids[gi]; if((g.kind||'')!=='capa') return null;
