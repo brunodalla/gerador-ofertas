@@ -1128,15 +1128,15 @@ function hltLines(text){
   return wrap(t);
 }
 // every line as wide as the box (justified, like Photoshop's box text): short words get bigger, both edges aligned
-function drawHltBox(ctx,text,x,y,color,dark,W0,bg){
+function drawHltBox(ctx,text,x,y,color,dark,W0,bg,track=-30){
   const lines=hltLines(text); if(!lines.length) return {x,y,w:0,h:0};
   const isNum=l=>/\d/.test(l)&&l.length<=8;
-  setFont(ctx,F_MBK,100,-30); const w100=lines.map(l=>ctx.measureText(l).width);
+  setFont(ctx,F_MBK,100,track); const w100=lines.map(l=>ctx.measureText(l).width);
   const W=W0||(lines.length===1&&isNum(lines[0])?165:199), pad=15;
   const sizes=lines.map((l,i)=>Math.min(110,100*(W-2*pad)/w100[i]));
   const gap=Math.max(5,W*0.03), tot=sizes.reduce((a,z)=>a+CAP.MontBk*z,0)+gap*(lines.length-1), H=tot+2*pad;
   rrect(ctx,x,y,W,H,14,bg||(dark?ORANGE:'#000')); if(dark&&!bg) color='#000';
-  let yy=y+pad; lines.forEach((l,i)=>{ yy+=CAP.MontBk*sizes[i]; drawRuns(ctx,[{text:l,font:F_MBK,size:sizes[i],track:-30}],x+W/2,yy,'center',color); yy+=gap; });
+  let yy=y+pad; lines.forEach((l,i)=>{ yy+=CAP.MontBk*sizes[i]; drawRuns(ctx,[{text:l,font:F_MBK,size:sizes[i],track}],x+W/2,yy,'center',color); yy+=gap; });
   return {x,y,w:W,h:H};
 }
 // draws an item's highlight boxes, each one movable/resizable on its own (item.hadj[text]={s,x,y}).
@@ -1144,7 +1144,7 @@ function drawHltBox(ctx,text,x,y,color,dark,W0,bg){
 function drawHlts(ctx,item,x,y,k,o,hits,slot){
   const tags=itemHlt(item); if(!tags.length) return null;
   const W0=o.W||null;
-  const ms=tags.map(t=>{ ctx.save(); ctx.globalAlpha=0; const m=drawHltBox(ctx,t,0,0,o.color,o.dark,W0,o.bg); ctx.restore(); return m; });
+  const ms=tags.map(t=>{ ctx.save(); ctx.globalAlpha=0; const m=drawHltBox(ctx,t,0,0,o.color,o.dark,W0,o.bg,o.track??-30); ctx.restore(); return m; });
   if(o.maxY!=null&&!o.row){ const tot=ms.reduce((a,m)=>a+m.h*k,0)+8*k*(ms.length-1); if(y+tot>o.maxY) y=Math.max(o.minY??-1e9,o.maxY-tot); }
   if(o.maxX!=null&&!o.row){ const mw=Math.max(...ms.map(m=>m.w*k)); if(x+mw>o.maxX) x=o.maxX-mw; }
   let cx=x, cy=y, rx=x+(o.right||0);
@@ -1153,7 +1153,7 @@ function drawHlts(ctx,item,x,y,k,o,hits,slot){
     if(o.row){ bx=rx-w; by=y; rx=bx-8*k; } else { bx=cx; by=cy; cy+=h+8*k; }
     const a=(item.hadj&&item.hadj[t])||{}, sc=a.s||1, ox=a.x||0, oy=a.y||0;
     const mx=bx+w/2+ox, my=by+h/2+oy;
-    ctx.save(); ctx.translate(mx,my); ctx.scale(k*sc,k*sc); drawHltBox(ctx,t,-m.w/2,-m.h/2,o.color,o.dark,W0,o.bg); ctx.restore();
+    ctx.save(); ctx.translate(mx,my); ctx.scale(k*sc,k*sc); drawHltBox(ctx,t,-m.w/2,-m.h/2,o.color,o.dark,W0,o.bg,o.track??-30); ctx.restore();
     if(hits) hits.push({k:slot,type:'hlt',t,x:mx-w*sc/2,y:my-h*sc/2,w:w*sc,h:h*sc});
   }
   return true;
@@ -1829,9 +1829,30 @@ function procLayout(ctx,st,item,s){
 }
 let STAMP_END=null;
 // highlight boxes of a product, below its price block, each with its own controls
-function stampHlts(ctx,A,item,k,gw,cell){ if(!STAMP_END||!itemHlt(item).length) return; const E=STAMP_END;
-  const bg=E.proc?rasterColor(A['r_'+(CUR_T&&procBoxFile(CUR_T))])||'#0b3aa8':'#111111';
-  drawHlts(ctx,item,E.x,E.y,1,{W:Math.max(150,Math.min(260,(gw||E.w||200)*0.85)),color:'#ffffff',bg,...(cell?{maxY:cell.y+cell.h-10,maxX:cell.x+cell.w-10,minY:cell.y+10}:{})},HITS,k); }
+// cores da oferta (tiradas do fundo da arte): a cor principal e um tom quente claro (amarelo/laranja), para as caixas de destaque combinarem
+let ART_PAL=null; const PALS={};
+function artPalette(key,img){ if(PALS[key]) return PALS[key]; if(!img) return null;
+  try{ const W=96, H=Math.max(1,Math.round(96*img.height/img.width)); const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d'); x.drawImage(img,0,0,W,H); const d=x.getImageData(0,0,W,H).data;
+    const bins=Array.from({length:24},()=>({n:0,r:0,g:0,b:0}));
+    for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b); if(d[i+3]<200||mx<60) continue; const s=(mx-mn)/mx; if(s<0.45) continue;
+      let h=mx===r?((g-b)/(mx-mn))%6:mx===g?(b-r)/(mx-mn)+2:(r-g)/(mx-mn)+4; h=(h*60+360)%360; const B=bins[Math.floor(h/15)]; B.n++; B.r+=r; B.g+=g; B.b+=b; }
+    const avg=B=>[B.r/B.n,B.g/B.n,B.b/B.n]; const hex=c=>'#'+c.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+    const top=[...bins.keys()].filter(i=>bins[i].n).sort((a,b)=>bins[b].n-bins[a].n);
+    if(!top.length) return PALS[key]={};
+    const main=avg(bins[top[0]]); const total=top.reduce((a,i)=>a+bins[i].n,0);
+    // tom quente claro (laranja/amarelo, 25° a 60°) que apareça de verdade na arte
+    const wi=top.find(i=>i>=2&&i<=3&&bins[i].n>total*0.003); let warm=wi!=null?avg(bins[wi]):null;
+    if(warm){ const l=lumC(warm); if(l<150) warm=warm.map(v=>v+(255-v)*0.35); }
+    // cor principal bem escura (para caixa em fundo claro)
+    const k=Math.min(1,70/Math.max(1,lumC(main))); const dark=main.map(v=>v*k);
+    return PALS[key]={main:hex(main),warm:warm?hex(warm):null,dark:hex(dark)}; }catch(e){ return PALS[key]={}; } }
+function stampHlts(ctx,A,item,k,gw,cell,bgl){ if(!STAMP_END||!itemHlt(item).length) return; const E=STAMP_END;
+  let bg, color='#ffffff', track=-30;
+  if(E.proc) bg=rasterColor(A['r_'+(CUR_T&&procBoxFile(CUR_T))])||'#0b3aa8';
+  else { const P=ART_PAL||{}; track=20;   // letras um pouco mais abertas: não encostam
+    if(bgl!=null&&bgl<150){ bg=P.warm||'#ffc21a'; color=P.dark||'#2a0000'; }      // fundo escuro/colorido: caixa quente clara, texto escuro
+    else { bg=P.dark||'#5a0a0a'; color=P.warm||'#ffffff'; } }                     // fundo claro: caixa escura da cor da oferta
+  drawHlts(ctx,item,E.x,E.y,1,{W:Math.max(150,Math.min(260,(gw||E.w||200)*0.85)),color,bg,track,...(cell?{maxY:cell.y+cell.h-10,maxX:cell.x+cell.w-10,minY:cell.y+10}:{})},HITS,k); }
 function procDraw(ctx,A,L,x,y){
   const ink=INKO||((BGL!=null&&BGL<165)?'#ffffff':'#111111');
   for(const o of L.ops){
@@ -2064,7 +2085,7 @@ function drawGridCell(ctx,A,T,cell,item,imgs,ss,k){
   let best=null, bv=-1e9; cands.forEach((b,i)=>{ const v=areaOf(b)*(i===0?1.1:1); if(v>bv){ bv=v; best=b; } });
   ctx.save(); ctx.beginPath(); ctx.rect(cell.x,cell.y,cell.w,cell.h); ctx.clip();
   const dr=best?drawProductImgs(ctx,imgs,adjBox(best,item.adj),false,'bottom',item.iadj,null,(item.adj&&item.adj.r)||0):null;
-  BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; stampHlts(ctx,A,item,k,gm.w,cell);
+  BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; stampHlts(ctx,A,item,k,gm.w,cell,lumC(bg));
   if(dr) HITS.push({k,type:'img',x:dr.x0,y:dr.y0,w:dr.x1-dr.x0,h:dr.y1-dr.y0,rects:dr.rects,clip:cell});
   HITS.push({k,type:'price',x:ex0,y:ey0,w:gm.w,h:gm.h});
   ctx.restore();
@@ -2155,7 +2176,7 @@ function renderCapa(ctx,A,T,Z,entries,bd){
   const lumAt=(x,y,w,h)=>{ try{ const d=bgc.getImageData(Math.max(0,Math.round(x)),Math.max(0,Math.round(y)),Math.max(1,Math.round(w)),Math.max(1,Math.round(h))).data; let t=0,c=0; for(let i=0;i<d.length;i+=16){ t+=d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11; c++; } return c?t/c:null; }catch(e){ return null; } };
   const off=q=>[(q.it.adj&&q.it.adj.px)||0,(q.it.adj&&q.it.adj.py)||0];
   const lums=all.map(q=>{ const [ox,oy]=off(q); return lumAt(q.x+ox,q.y+oy,q.gm.w,q.gm.h); });
-  all.forEach((q,i)=>{ const [ox,oy]=off(q); BGL=lums[i]; STAMP_END=null; drawStamp(ctx,A,q.st,q.it,q.x+q.gm.lx+ox,q.y+q.gm.up+oy,q.s); BGL=null; stampHlts(ctx,A,q.it,kOf.get(q.it),q.gm.w); });
+  all.forEach((q,i)=>{ const [ox,oy]=off(q); BGL=lums[i]; STAMP_END=null; drawStamp(ctx,A,q.st,q.it,q.x+q.gm.lx+ox,q.y+q.gm.up+oy,q.s); BGL=null; stampHlts(ctx,A,q.it,kOf.get(q.it),q.gm.w,null,lums[i]); });
   const fdrawn=front.map(q=>q._dr);
   [...back.map((q,i)=>[q,drawn[i]]),...front.map(q=>[q,q._dr])].forEach(([q,dr])=>{ if(dr) HITS.push({k:kOf.get(q.it),type:'img',x:dr.x0,y:dr.y0,w:dr.x1-dr.x0,h:dr.y1-dr.y0,rects:dr.rects}); });
   all.forEach(q=>{ const [ox,oy]=off(q); HITS.push({k:kOf.get(q.it),type:'price',x:q.x+ox,y:q.y+oy,w:q.gm.w,h:q.gm.h}); });
@@ -2243,7 +2264,7 @@ function renderReplay(ctx,A,T,data){
   const bd=bdById(T,data.bd)||chooseBd(T,data.kind,!!data.band,data.title,data.validity);
   if(ctx.canvas.width!==bd.W||ctx.canvas.height!==bd.H){ ctx.canvas.width=bd.W; ctx.canvas.height=bd.H; }
   ctx.clearRect(0,0,bd.W,bd.H);
-  const base=A['bg_'+bd.id]; if(base) ctx.drawImage(base,0,0,bd.W,bd.H);
+  const base=A['bg_'+bd.id]; if(base) ctx.drawImage(base,0,0,bd.W,bd.H); ART_PAL=artPalette(bd.id,base);
   const v=data.validity||{from:'__/__',to:'__/__'};
   for(const d of bd.dates){ const txt=footerFromTemplate(d.text.replace(/\r$/,''),v.from,v.to); drawBlock(ctx,d,txt.split('\r')); }
   const kind=data.kind||(T.grid&&Object.keys(data.slots).length>4?'grid':'capa');
