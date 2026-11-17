@@ -8,16 +8,16 @@
   "layout": "caixa",
   "intro": {
     "src": "intro.mp4",
-    "dur": 6.792,
+    "dur": 6.7917,
     "audio": "intro.mp3"
   },
   "fundo": {
     "src": "fundo.mp4",
-    "dur": 8.034
+    "dur": 8.0333
   },
   "assina": {
     "src": "assina.mp4",
-    "dur": 5.0833,
+    "dur": 5.625,
     "audio": "assina.mp3"
   },
   "transicao": {
@@ -154,9 +154,5 @@
       "nomeCor": "#111111",
       "top": 700
     }
-  },
-  "chamadas": {
-    "padrao": "sexta a sábado",
-    "opcoes": {}
   }
 }
