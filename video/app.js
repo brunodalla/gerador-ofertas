@@ -57,7 +57,9 @@ function aplicaChamada(redesenha=true){
     const k=Object.keys(C.opcoes||{}).find(k=>normCham(k)===want);
     if(k){ const o=C.opcoes[k]; m={...B}; for(const part of ['intro','fundo','assina']) if(o[part]) m[part]={...B[part],...o[part]}; }
   }
-  V.model=m; V.A=null; V.assetsP=null; PVBG=null; mostraChamada();
+  // troca de modelo: fecha os vídeos, quadros e imagens do modelo anterior
+  if(V.model!==m){ const old=V.assetsP; if(old) old.then(E.disposeAssets).catch(()=>{}); if(PVBG&&PVBG.bmp) PVBG.bmp.close(); V.A=null; V.assetsP=null; PVBG=null; }
+  V.model=m; mostraChamada();
   if(redesenha&&V.job){ renderItems(); }
 }
 function mostraChamada(){
@@ -80,7 +82,9 @@ async function assets(){
 function itemFalado(it){ return it.falado||FALADO[E.norm(it.name)]||E.nomeFaladoAuto(it.name); }
 // fotos do produto: a principal (it.img) e as outras (it.fotos), por exemplo duas marcas na mesma oferta
 const fotosDe=it=>[it.img,...(it.fotos||[])].filter(Boolean);
-const clearImg=it=>{ for(const k of [...V.imgs.keys()]) if(String(k).startsWith(it.id+':')) V.imgs.delete(k); };
+const fechaImg=p=>Promise.resolve(p).then(v=>{ for(const b of [].concat(v||[])) try{ b.close(); }catch(e){} }).catch(()=>{});
+const clearImg=it=>{ for(const k of [...V.imgs.keys()]) if(String(k).startsWith(it.id+':')){ fechaImg(V.imgs.get(k)); V.imgs.delete(k); } };
+function limpaImgs(){ for(const p of V.imgs.values()) fechaImg(p); limpaImgs(); }
 async function itemImg(it){
   const fs=fotosDe(it); if(!fs.length) return null;
   const key=it.id+':'+fs.length;
@@ -88,15 +92,19 @@ async function itemImg(it){
   const p=Promise.all(fs.map(f=>createImageBitmap(f).then(trimBitmap).catch(()=>null))).then(a=>{ a=a.filter(Boolean); return a.length>1?a:(a[0]||null); });
   V.imgs.set(key,p); return p;
 }
-// corta a transparência em volta do produto
+// corta a transparência em volta do produto e reduz a foto ao tamanho máximo em que aparece no vídeo
+const FOTO_MAX=1400;
 async function trimBitmap(bmp){
-  const c=new OffscreenCanvas(bmp.width,bmp.height), x=c.getContext('2d'); x.drawImage(bmp,0,0);
+  const k=Math.min(1,FOTO_MAX/Math.max(bmp.width,bmp.height)), W=Math.max(1,Math.round(bmp.width*k)), H=Math.max(1,Math.round(bmp.height*k));
+  const c=new OffscreenCanvas(W,H), x=c.getContext('2d',{willReadFrequently:true}); x.imageSmoothingQuality='high'; x.drawImage(bmp,0,0,W,H); bmp.close();
   const d=x.getImageData(0,0,c.width,c.height).data; let x0=c.width,y0=c.height,x1=-1,y1=-1;
   for(let y=0;y<c.height;y+=2) for(let i=0;i<c.width;i+=2){ if(d[(y*c.width+i)*4+3]>12){ if(i<x0)x0=i; if(i>x1)x1=i; if(y<y0)y0=y; if(y>y1)y1=y; } }
-  if(x1<0) return bmp;
+  if(x1<0) return createImageBitmap(c);
   x0=Math.max(0,x0-2); y0=Math.max(0,y0-2); x1=Math.min(c.width-1,x1+2); y1=Math.min(c.height-1,y1+2);
   return createImageBitmap(c,x0,y0,x1-x0+1,y1-y0+1);
 }
+// um endereço por foto (antes cada redesenho da lista criava outro e nenhum era solto)
+const URLS=new WeakMap(); const urlDe=b=>{ let u=URLS.get(b); if(!u){ u=URL.createObjectURL(b); URLS.set(b,u); } return u; };
 function renderItems(){
   const box=$('#items'); box.innerHTML='';
   if(!V.job.items.length){ box.append(el('div',{class:'st'},'Nenhum produto ainda. Cole a lista que o cliente mandou em "Colar lista de produtos", traga do Gerador de Ofertas ou adicione um por um em "+ Produto".')); return; }
@@ -107,7 +115,7 @@ function renderItems(){
       el('button',{class:'lnk',title:'Pôr mais uma foto (outra marca, outro sabor). Até 3.',disabled:!it.img||nf>=3,onclick:()=>pickImage(it,true)},'+ foto'),
       nf>1?el('button',{class:'lnk',title:'Tirar a última foto extra',onclick:()=>{ it.fotos=(it.fotos||[]).slice(0,-1); clearImg(it); saveJob(); renderItems(); }},'− foto'):null,
       nf>1?el('span',{class:'st'},nf+' fotos'):null);
-    if(it.img){ th.style.backgroundImage=`url(${URL.createObjectURL(it.img)})`; th.classList.add('has'); }
+    if(it.img){ th.style.backgroundImage=`url(${urlDe(it.img)})`; th.classList.add('has'); }
     const pv=el('canvas',{class:'pv',width:216,height:384,title:'Arraste a foto ou o preço para mover · Ctrl + rodinha muda o tamanho · clique para ver maior',onclick:()=>{ if(pv._arrastou){ pv._arrastou=false; return; } bigPreview(it); }});
     arrastaPrevia(pv,it,()=>renderItems());
     const upd=(k,v)=>{ it[k]=v; E.resetLayouts([it]); saveJob(); say.textContent='🔊 '+E.fraseOferta({...it,falado:itemFalado(it)},V.model); renderSegs(); drawPreview(it,pv); };
@@ -275,7 +283,7 @@ function pickProducts(h){
     const upd=()=>{ box.querySelectorAll('.pk').forEach(c=>{ const i=sel.indexOf(+c.dataset.i); c.classList.toggle('on',i>=0); c.querySelector('.num').textContent=i>=0?i+1:''; }); btnOk.textContent=`Usar ${sel.length} produto${sel.length===1?'':'s'}`; btnOk.disabled=!sel.length; };
     h.items.forEach((x,i)=>{
       const club=x.club!=null&&x.club!==''; const v=E.parseMoney(club?x.club:x.price);
-      const th=el('div',{class:'pth'}); if(x.img) th.style.backgroundImage=`url(${URL.createObjectURL(x.img)})`;
+      const th=el('div',{class:'pth'}); if(x.img) th.style.backgroundImage=`url(${urlDe(x.img)})`;
       box.append(el('div',{class:'pk','data-i':i,onclick:()=>{ const k=sel.indexOf(i); if(k>=0) sel.splice(k,1); else sel.push(i); upd(); }},
         el('span',{class:'num'}),th,el('div',{class:'pn'},x.name),el('div',{class:'pp'},v!=null?E.precoTela(v)+(club?' clube':'')+(/KG/i.test(x.unit||'')?' kg':''):'')));
     });
@@ -307,7 +315,7 @@ async function fromGenerator(){
   { const c=chosen.find(x=>x.dayText); V.job.chamada=c?c.dayText:''; aplicaChamada(false); }
   if(!V.job.title&&h.title) V.job.title=h.title;
   V.job.val=E.datasTexto(V.job.from,V.job.to)||V.job.val;
-  V.imgs.clear(); fillJobFields(); renderItems(); renderSegs(); saveJob();
+  limpaImgs(); fillJobFields(); renderItems(); renderSegs(); saveJob();
   toast(`${V.job.items.length} produtos trazidos do Gerador de Ofertas.`);
 }
 
@@ -400,6 +408,8 @@ let SEGRUN=0;
 async function renderSegs(){
   const run=++SEGRUN; const box=document.createDocumentFragment();
   const list=segList(); let missing=0;
+  // solta da memória as locuções de produtos que saíram do vídeo
+  { const keys=new Set(list.map(s=>s.key)); for(const k of [...V.seg.keys()]) if(!keys.has(k)) V.seg.delete(k); }
   for(const s of list){
     const buf=await segAudio(s).catch(()=>null); if(!buf) missing++;
     const info=el('span',{class:'st '+(buf?'ok':'')},buf?`${buf.duration.toFixed(1)} s`:'falta gerar');
@@ -458,7 +468,7 @@ async function render(){
   const {missing}=await currentTimeline();
   if(missing&&!confirm(`Faltam ${missing} trecho(s) de locução. Gerar o vídeo mesmo assim?`)) return;
   V.busy=true; ABORT=new AbortController(); const b=$('#btn-render'); b.textContent='Cancelar';
-  $('#out').innerHTML='';
+  if(V.outUrl){ URL.revokeObjectURL(V.outUrl); V.outUrl=null; } V.lastBlob=null; $('#out').innerHTML=''; $('#thumbs').innerHTML='';
   try{
     const A=await assets();
     const {tl,items}=await currentTimeline(); const imgs=await imgsFor(items); E.resetLayouts(items);
@@ -468,7 +478,7 @@ async function render(){
     const blob=await E.renderMp4({tl,model:V.model,A,imgs,datas:V.job.val,audio,signal:ABORT.signal,onProgress:(p,s)=>{ $('#prog').style.width=(p*100).toFixed(1)+'%'; st('st-render',`Gerando o vídeo… ${Math.round(p*100)}% · ${Math.round(s)} s`); }});
     V.lastBlob=blob;
     const name=(V.job.title||V.model.nome).replace(/[\\/:*?"<>|·]+/g,' ').replace(/\s+/g,' ').trim()+'.mp4';
-    const url=URL.createObjectURL(blob);
+    const url=URL.createObjectURL(blob); V.outUrl=url;
     const share=navigator.canShare&&navigator.canShare({files:[new File([blob],name,{type:'video/mp4'})]});
     $('#out').append(el('video',{class:'out',src:url,controls:true}),el('div',{class:'row',style:'margin-top:8px'},
       el('a',{class:'btn',href:url,download:name},'Baixar MP4'),
@@ -488,12 +498,12 @@ async function openJobs(){
   const box=$('#jobs-list'); box.innerHTML='Carregando…'; $('#dlg-jobs').showModal();
   const keys=await IDB.keys('vjob:'); const jobs=[]; for(const k of keys){ const j=await IDB.get(k); if(j) jobs.push(j); }
   jobs.sort((a,b)=>b.at-a.at); box.innerHTML='';
-  box.append(el('button',{onclick:async()=>{ V.job=blankJob(); V.seg.clear(); V.imgs.clear(); fillJobFields(); renderItems(); renderSegs(); saveJob(); $('#dlg-jobs').close(); }},'+ Vídeo novo (vazio)'));
+  box.append(el('button',{onclick:async()=>{ V.job=blankJob(); V.seg.clear(); limpaImgs(); fillJobFields(); renderItems(); renderSegs(); saveJob(); $('#dlg-jobs').close(); }},'+ Vídeo novo (vazio)'));
   for(const j of jobs) box.append(el('div',{class:'row',style:'justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0'},
     el('div',{},el('b',{},j.title||'(sem nome)'),el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.items.length} produtos`)),
     el('div',{class:'row'},el('button',{class:'pri',onclick:async()=>{ await openJob(j); $('#dlg-jobs').close(); }},'Abrir'),el('button',{class:'lnk',onclick:async e=>{ await IDB.del('vjob:'+j.id); e.target.closest('.row').parentElement.remove(); }},'✕'))));
 }
-async function openJob(j){ V.job=j; V.seg.clear(); V.imgs.clear(); if(j.model&&j.model!==V.model.id) await setModel(j.model); else aplicaChamada(false); fillJobFields(); renderItems(); renderSegs(); }
+async function openJob(j){ V.job=j; V.seg.clear(); limpaImgs(); if(j.model&&j.model!==V.model.id) await setModel(j.model); else aplicaChamada(false); fillJobFields(); renderItems(); renderSegs(); }
 
 // ---------- início ----------
 async function init(){

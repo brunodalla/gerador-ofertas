@@ -542,7 +542,10 @@ export async function loadAssets(base,model,onStep=()=>{}){
   onStep('vídeos');
   [A.intro,A.fundo,A.assina]=await Promise.all(['intro','fundo','assina'].map(k=>openVideo(base+model[k].src)));
   onStep('transição');
-  A.tr=await Promise.all([...Array(model.transicao.frames)].map(async(_,i)=>createImageBitmap(await (await fetch(`${base}${model.transicao.pasta}/${String(i).padStart(2,'0')}.webp`)).blob())));
+  // transição: guarda só os arquivos WebP (comprimidos) e abre cada quadro na hora em que é usado.
+  // Abertos todos de uma vez, 30 quadros de 1080x1920 ocupavam ~250 MB na memória.
+  A.trBlobs=await Promise.all([...Array(model.transicao.frames)].map(async(_,i)=>(await fetch(`${base}${model.transicao.pasta}/${String(i).padStart(2,'0')}.webp`)).blob()));
+  A.trCache=new Map();
   if(model.tag) A.tag=await createImageBitmap(await (await fetch(base+model.tag)).blob());
   // imagens do layout "caixa" (caixa do clube, selo, caixas de limite/observação)
   A.img={}; const want=new Set();
@@ -557,8 +560,26 @@ export async function loadAssets(base,model,onStep=()=>{}){
   return A;
 }
 
+// abre os quadros da transição que aparecem no tempo t (e o seguinte) e fecha os que já passaram
+async function trPrep(A,tl,model,t){
+  const fps=model.transicao.fps||model.fps, need=new Set();
+  for(const tr of tl.trans){ const f=Math.floor((t-tr.start)*fps+1e-6); if(f>=0&&f<A.trBlobs.length){ need.add(f); if(f+1<A.trBlobs.length) need.add(f+1); } }
+  for(const [f,b] of A.trCache) if(!need.has(f)){ Promise.resolve(b).then(x=>x&&x.close&&x.close()); A.trCache.delete(f); }
+  for(const f of need) if(!A.trCache.has(f)) A.trCache.set(f,createImageBitmap(A.trBlobs[f]));
+  await Promise.all([...need].map(async f=>{ A.trCache.set(f,await A.trCache.get(f)); }));
+}
+// libera tudo o que um modelo abriu (quadros, imagens, vídeos e áudio) ao trocar de modelo
+export function disposeAssets(A){
+  if(!A) return;
+  const fecha=b=>{ try{ b&&b.close&&b.close(); }catch(e){} };
+  if(A.trCache){ for(const b of A.trCache.values()) Promise.resolve(b).then(fecha); A.trCache.clear(); }
+  fecha(A.tag); for(const k in (A.img||{})) fecha(A.img[k]);
+  for(const k of ['intro','fundo','assina']) if(A[k]){ try{ A[k].input.dispose&&A[k].input.dispose(); }catch(e){} }
+  for(const k of Object.keys(A)) A[k]=null;
+}
 // quadro único (para conferir o layout) no tempo t
 export async function drawFrameAt(ctx,tl,model,A,imgs,datas,t){
+  await trPrep(A,tl,model,t);
   const p=tl.parts.find(p=>t>=p.start&&t<p.end)||tl.parts[tl.parts.length-1];
   const src=p.type==='intro'?A.intro:p.type==='assina'?A.assina:A.fundo;
   let lt=t-p.start; lt=Math.min(lt,src.dur-1/60);   // oferta mais longa que o fundo: fica parado no último quadro
@@ -574,7 +595,7 @@ function overlay(ctx,tl,model,A,imgs,datas,t,p){
     drawFor(ctx,p.item,imgs[p.idx],L,t-p.start,A,p.precoAt!=null?p.precoAt-p.start:null,model);
   }
   const trFps=model.transicao.fps||model.fps;
-  for(const tr of tl.trans){ const f=Math.floor((t-tr.start)*trFps+1e-6); if(f>=0&&f<A.tr.length) ctx.drawImage(A.tr[f],0,0,model.w,model.h); }
+  for(const tr of tl.trans){ const f=Math.floor((t-tr.start)*trFps+1e-6); const b=A.trCache&&A.trCache.get(f); if(b&&!(b instanceof Promise)) ctx.drawImage(b,0,0,model.w,model.h); }
 }
 export function resetLayouts(items){ for(const it of items) LCACHE.delete(it); }
 
@@ -605,12 +626,14 @@ export async function renderMp4({tl,model,A,imgs,datas,audio,onProgress=()=>{},s
     }
     const r=await it.next(); const wc=r.value;
     if(wc) ctx.drawImage(wc.canvas,0,0,w,h);
+    await trPrep(A,tl,model,t);
     overlay(ctx,tl,model,A,imgs,datas,t,p);
     await vsrc.add(t,1/fps);
     if(f%10===0) onProgress(f/N,(performance.now()-t0)/1000);
   }
   if(it&&it.return) await it.return();
   vsrc.close();
+  for(const b of A.trCache.values()) Promise.resolve(b).then(x=>x&&x.close&&x.close()); A.trCache.clear();
   await asrc.add(audio); asrc.close();
   await output.finalize();
   onProgress(1,(performance.now()-t0)/1000);
