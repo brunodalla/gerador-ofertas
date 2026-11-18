@@ -228,6 +228,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
 .st-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .st-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .st-n{font-weight:700;white-space:nowrap}
+.stkchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line2);border-radius:99px;padding:2px 10px;font-size:12px}
 .btn.sm{padding:5px 10px;font-size:12px}
 .row.ck-err{box-shadow:inset 4px 0 0 var(--bad)} .row.ck-warn{box-shadow:inset 4px 0 0 var(--warn)}
 .row.ck-flash{outline:2px solid var(--or);outline-offset:2px}
@@ -381,6 +382,37 @@ function seloImg(src){ if(SELO_IMG[src]) return SELO_IMG[src].complete?SELO_IMG[
 function drawSeal(ctx,g){ const S0=g&&g.seal; if(!S0) return; const src=S0.src||(SELOS[S0.id]&&SELOS[S0.id].src); if(!src) return; const im=seloImg(src); if(!im) return;
   const W=ctx.canvas.width, sz=(S0.s||1)*W*0.2, x=W*0.965-sz+(S0.x||0), y=W*0.255+(S0.y||0);
   ctx.drawImage(im,x,y,sz,sz*im.height/im.width); }
+
+// ---------- Selos e imagens soltas: ficam por cima de tudo na arte, cada um com lugar, tamanho e giro próprios ----------
+// g.stk=[{id|src,name,x,y,w,r}]  x,y = centro (fração da largura/altura da arte), w = largura (fração da largura da arte), r = graus
+const STK_DRAW={
+  '18':{name:'18+ (bebida alcoólica)',make(){ const c=document.createElement('canvas'); c.width=c.height=400; const x=c.getContext('2d');
+    x.fillStyle='#fff'; x.beginPath(); x.arc(200,200,196,0,7); x.fill(); x.strokeStyle='#e30613'; x.lineWidth=34; x.beginPath(); x.arc(200,200,170,0,7); x.stroke();
+    x.fillStyle='#1a1a1a'; x.textAlign='center'; x.textBaseline='alphabetic'; x.font="900 170px MontBk, 'Arial Black', sans-serif"; const t='18+'; let w=x.measureText(t).width; const k=Math.min(1,250/w);
+    x.save(); x.translate(200,262); x.scale(k,1); x.fillText(t,0,0); x.restore(); return c; }},
+  'novo':{name:'NOVO (estrela)',make(){ const c=document.createElement('canvas'); c.width=c.height=400; const x=c.getContext('2d'); x.translate(200,200);
+    x.fillStyle='#ffd400'; x.beginPath(); for(let i=0;i<32;i++){ const a=i*Math.PI/16, r=i%2?160:196; x.lineTo(Math.cos(a)*r,Math.sin(a)*r); } x.closePath(); x.fill();
+    x.fillStyle='#d4001c'; x.textAlign='center'; x.font="900 96px MontBk, 'Arial Black', sans-serif"; x.rotate(-0.14); x.fillText('NOVO',0,34); return c; }},
+};
+const STK_CACHE={};
+function stkImage(s){
+  if(s.id&&STK_DRAW[s.id]) return STK_CACHE[s.id]||(STK_CACHE[s.id]=STK_DRAW[s.id].make());
+  const src=s.src||(s.id&&SELOS[s.id]&&SELOS[s.id].src); return src?seloImg(src):null;
+}
+function stkName(s){ return s.name||(s.id&&((STK_DRAW[s.id]&&STK_DRAW[s.id].name)||(SELOS[s.id]&&SELOS[s.id].name)))||'imagem'; }
+// desenha por cima de tudo e devolve as áreas clicáveis (para arrastar na prévia)
+function drawStickers(ctx,g){ const out=[]; const W=ctx.canvas.width, H=ctx.canvas.height;
+  (g&&g.stk||[]).forEach((s,i)=>{ const im=stkImage(s); if(!im||!im.width) return; const w=(s.w||0.16)*W, h=w*im.height/im.width, cx=(s.x??0.5)*W, cy=(s.y??0.5)*H;
+    ctx.save(); ctx.translate(cx,cy); if(s.r) ctx.rotate(s.r*Math.PI/180); ctx.drawImage(im,-w/2,-h/2,w,h); ctx.restore();
+    out.push({i,x:cx-w/2,y:cy-h/2,w,h}); });
+  return out; }
+// imagem enviada: reduz e guarda dentro do trabalho (vai junto para o Drive e para o celular)
+function stkFromFile(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onerror=rej; fr.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{
+      const k=Math.min(1,700/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      res({src:c.toDataURL('image/webp',0.92),name:(file.name||'imagem').replace(/\.[^.]+$/,'').slice(0,30)}); }; im.src=fr.result; }; fr.readAsDataURL(file); }); }
+// últimas imagens enviadas ficam à mão para as próximas artes
+async function stkLib(){ return (await IDB.get('stk.lib'))||[]; }
+async function stkRemember(s){ const L=(await stkLib()).filter(x=>x.src!==s.src); L.unshift({src:s.src,name:s.name}); await IDB.set('stk.lib',L.slice(0,12)); }
 
 // Product name -> library image matching (token + IDF scoring)
 const STOP = new Set(['de','da','do','das','dos','com','sem','ou','e','a','o','em','para','p','c','und','un','unid','unidade','kg','sabores','sabor','fragrancias','tradicional','pacote','cx','caixa','pct','unds','unidades']);
@@ -2091,6 +2123,8 @@ function drawGridCell(ctx,A,T,cell,item,imgs,ss,k){
     .filter(b=>b.w>40&&b.h>40);
   const areaOf=b=>{ const f=fitRect(imgs,b); if(!f) return 0; const ov=Math.max(0,Math.min(f.x+f.w,ex1)-Math.max(f.x,ex0))*Math.max(0,Math.min(f.y+f.h,ey1)-Math.max(f.y,ey0)); return f.w*f.h-ov*12; };
   let best=null, bv=-1e9; cands.forEach((b,i)=>{ const v=areaOf(b)*(i===0?1.1:1); if(v>bv){ bv=v; best=b; } });
+  if(PINS&&PINS.grid){ const sg=(imgs||[]).map(im=>im.width+'x'+im.height).join(',')+'|'+[cell.x,cell.y,cell.w,cell.h].map(Math.round).join(','); const pin=PINS.grid.cells[k];
+    if(pin&&pin.sig===sg&&pin.box) best=pin.box; else if(best) PINS.grid.cells[k]={sig:sg,box:{x:best.x,y:best.y,w:best.w,h:best.h}}; }
   ctx.save(); ctx.beginPath(); ctx.rect(cell.x,cell.y,cell.w,cell.h); ctx.clip();
   const dr=best?drawProductImgs(ctx,imgs,adjBox(best,item.adj),false,'bottom',item.iadj,null,(item.adj&&item.adj.r)||0):null;
   BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; stampHlts(ctx,A,item,k,gm.w,cell,lumC(bg));
@@ -2147,7 +2181,7 @@ function renderCapa(ctx,A,T,Z,entries,bd){
     return ar.map((v,i)=>v?Math.max(0.9,Math.min(cls[i]===1?1:1.6,tgt/v)):1); })();   // itens pequenos de verdade (lata, sachê, limão) não crescem
   const uBox=(b,u,minY,xa=Z[0],xb=Z[2],maxW=1e9)=>{ const cx=b.x+b.w/2, bot=b.y+b.h; let w=Math.min(b.w*u,maxW,xb-xa), h=b.h*u; if(bot-h<minY) h=bot-minY;
     let x=cx-w/2; x=Math.max(xa,Math.min(xb-w,x)); return {x,y:bot-h,w,h}; };
-  back.forEach((b,i)=>{ let box=uBox(bBox(i),UNI[i],backTop);
+  back.forEach((b,i)=>{ let box=uBox(bBox(i),UNI[i],backTop); b.box0=box;
     b.box=adjBox(box,b.it.adj); b.imgs=entries[i].imgs;
     const fr=fitRect(b.imgs,b.box,3.2)||{x:b.box.x,y:b.box.y,w:b.box.w,h:b.box.h}; b.rect=[fr.x,fr.y,fr.x+fr.w,fr.y+fr.h];
     const cx=(b.rect[0]+b.rect[2])/2; let x=cx-b.gm.w/2; x=Math.max(Z[0],Math.min(Z[2]-b.gm.w,x));
@@ -2157,7 +2191,7 @@ function renderCapa(ctx,A,T,Z,entries,bd){
   for(let i=back.length-1;i>=0;i--){ const b=back[i]; const lim=i<back.length-1?back[i+1].x-10:Z[2]; if(b.x+b.gm.w>lim) b.x=lim-b.gm.w; }
   for(let i=1;i<back.length;i++){ const a=back[i-1], b=back[i]; const ov=inter([a.x,a.y,a.x+a.gm.w,a.y+a.gm.h],[b.x,b.y,b.x+b.gm.w,b.y+b.gm.h]); if(ov>0){ if(b.y>=a.y) b.y=Math.max(Z[1],a.y-0) ; b.x=a.x+a.gm.w+8; } }
   if(nf){
-    front.forEach((f,j)=>{ let box=uBox(fBox(j),UNI[nb+j],backTop+(backBot-backTop)*0.22,Z[0],Z[2],ZW*(nf>1?0.54:0.9));
+    front.forEach((f,j)=>{ let box=uBox(fBox(j),UNI[nb+j],backTop+(backBot-backTop)*0.22,Z[0],Z[2],ZW*(nf>1?0.54:0.9)); f.box0=box;
       f.box=adjBox(box,f.it.adj); f.imgs=entries[nb+j].imgs;
       const fr=fitRect(f.imgs,f.box,3.2)||{x:f.box.x,y:f.box.y+f.box.h*0.3,w:f.box.w,h:f.box.h*0.7}; f.rect=[fr.x,fr.y,fr.x+fr.w,fr.y+fr.h];
       const right=nf>1&&j===nf-1;
@@ -2169,6 +2203,17 @@ function renderCapa(ctx,A,T,Z,entries,bd){
     if(nf>2) front.slice(1,-1).forEach(f=>{ f.x=(f.rect[0]+f.rect[2])/2-f.gm.w/2; f.y=Math.min(Z[3]-f.gm.h,f.rect[3]-f.gm.h); });
   }
   const all=[...back,...front];
+  // CAPA PRESA: a arrumação automática roda uma vez e fica guardada (lugar de cada foto, lugar e tamanho de cada preço).
+  // Depois disso, mexer em um preço, em uma descrição ou em uma foto muda só aquilo: nada mais se mexe sozinho.
+  // Só arruma de novo quando muda o número de produtos, o fundo/tarja, ou a foto daquele produto.
+  if(PINS){ const sigAll=[T.id,bd&&bd.id,Z.map(v=>Math.round(v)).join(','),n].join('|');
+    const sSig=i=>(entries[i].imgs||[]).map(im=>im.width+'x'+im.height).join(',')+(entries[i].item.club?'|c':'|s');
+    const ps=q=>(q.it.adj&&q.it.adj.ps)||1;
+    // k0: nos trabalhos antigos (salvos antes desta regra) o "preço" da arte não mexia na capa, então o valor que estava lá vira o ponto de partida
+    const rec=(q,i)=>({sig:sSig(i),box:{x:q.box0.x,y:q.box0.y,w:q.box0.w,h:q.box0.h},ox:q.x+q.gm.lx,oy:q.y+q.gm.up,s:q.s/ps(q),k0:PINS.legacy?PRICESIZE:1});
+    if(!PINS.capa||PINS.capa.sig!==sigAll) PINS.capa={sig:sigAll,slots:all.map(rec)};
+    all.forEach((q,i)=>{ let pin=PINS.capa.slots[i]; if(!pin||pin.sig!==sSig(i)) pin=PINS.capa.slots[i]=rec(q,i);
+      q.box=adjBox(pin.box,q.it.adj); q.s=pin.s*ps(q)*PRICESIZE/(pin.k0||1); q.gm=stampGeom(ctx,q.st,q.it,q.s); q.x=pin.ox-q.gm.lx; q.y=pin.oy-q.gm.up; }); }
   // products are drawn on a layer first so the darker "floor" of the backdrop can rise behind them
   const pl=document.createElement('canvas'); pl.width=ctx.canvas.width; pl.height=ctx.canvas.height; const px=pl.getContext('2d');
   const drawn=back.map(q=>drawProductImgs(px,q.imgs,q.box,true,'bottom',q.it.iadj,q.it.sh,(q.it.adj&&q.it.adj.r)||0));
@@ -2265,9 +2310,10 @@ function renderFixed(ctx,A,T,data){
   if(it.club&&it.price){ setFont(ctx,'MontSB',sn*0.8,0); ctx.fillText('NO CLUBE · PREÇO NORMAL R$ '+it.price.toFixed(2).replace('.',','),N.cx,N.base+dy+sn*1.1); }
   const used={}; SLOT_ORDER.forEach(k=>{ if(data.slots[k]) used[k]='replay'; }); return {used,bd};
 }
+let PINS=null;   // arrumação guardada da arte que está sendo desenhada (data.pins)
 let HITS=[];   // clickable areas of the last render (drag on the preview)
 function renderReplay(ctx,A,T,data){
-  CUR_T=T; HITS=[]; procLayout.auto=T.namePos||'side'; NAMECASE=data.nameCase||(T.client==='Proner'?'title':'auto'); NAMESIZE=data.nameSize||T.nameSize||1; PRICESIZE=data.priceSize||1; ARTINK=data.ink||null;
+  CUR_T=T; HITS=[]; PINS=data.pins||null; procLayout.auto=T.namePos||'side'; NAMECASE=data.nameCase||(T.client==='Proner'?'title':'auto'); NAMESIZE=data.nameSize||T.nameSize||1; PRICESIZE=data.priceSize||1; ARTINK=data.ink||null;
   if(T.fixed) return renderFixed(ctx,A,T,data);
   const bd=bdById(T,data.bd)||chooseBd(T,data.kind,!!data.band,data.title,data.validity);
   if(ctx.canvas.width!==bd.W||ctx.canvas.height!==bd.H){ ctx.canvas.width=bd.W; ctx.canvas.height=bd.H; }
@@ -2280,7 +2326,11 @@ function renderReplay(ctx,A,T,data){
   const Z=zoneOf(T,bd,kind==='grid'&&T.grid?'grid':'capa',!!data.band);
   if(kind==='grid'&&T.grid){ const cells=gridCells(entries.length,T.grid,Z);
     if(T.grid.gutterCol){ ctx.fillStyle=hexOf(T.grid.gutterCol); ctx.fillRect(Z[0],Z[1],Z[2]-Z[0],Z[3]-Z[1]); }
-    const s=gridScale(ctx,T,cells,entries);
+    let s=gridScale(ctx,T,cells,entries);
+    // GRADE PRESA: o tamanho dos preços da arte e o lugar de cada foto ficam guardados; só mudam quando muda a grade (número de produtos, quadros) ou a foto
+    if(PINS){ const sig=[T.id,bd&&bd.id,entries.length,cells.map(c=>[c.x,c.y,c.w,c.h].map(Math.round).join(',')).join(';'),entries.map(e=>e.item.club?'c':'s').join('')].join('|');
+      if(!PINS.grid||PINS.grid.sig!==sig) PINS.grid={sig,ss:{simple:s.simple/PRICESIZE,club:s.club/PRICESIZE},cells:{}};
+      else s={simple:PINS.grid.ss.simple*PRICESIZE,club:PINS.grid.ss.club*PRICESIZE}; }
     entries.forEach((e,i)=>drawGridCell(ctx,A,T,cells[i],e.item,e.imgs,s,e.k)); }
   else renderCapa(ctx,A,T,Z,entries,bd);
   const br=bandRectOf(T,bd,!!data.band); if(br) drawBand(ctx,T,bd,br,data.band);
@@ -3241,7 +3291,7 @@ function sigOf(g){
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
-  grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
+  grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
 async function openJobsDialog(){
@@ -3282,7 +3332,7 @@ async function openSavedJob(name,job){
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
-  S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,
+  S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
     savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
     validity:jg.validity||{from:job.from||'',to:job.to||''},
     // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
@@ -3307,7 +3357,7 @@ function updateSaveState(){
   const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
-  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.dayText=jg.dayText||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
+  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.dayText=jg.dayText||null; g.pins=jg.pins||{legacy:true}; g.stk=jg.stk||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
   $('#in-cities').value=job.citiesOff?'':(job.cities||$('#in-cities').value); if(job.citiesOff) $('#in-cities').dataset.manual='1'; $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
 }
 function changed(it){ const o=it.orig||{}; return it.name!==o.name||it.price!==o.price||it.club!==o.club||it.unit!==o.unit||it.raw!==it.raw0; }
@@ -3749,7 +3799,7 @@ async function gridData(g){
   const slots={};
   for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh,hlt:it.hlt,hadj:it.hadj},imgs,variant:it.variant||undefined}; }
   const T=activate(g);
-  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize,ink:g.ink}; }
+  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize,ink:g.ink,pins:(g.pins||(g.pins={}))}; }
   const bev=!!(g.bebidas&&TPL.bebidas);
   let from=$('#in-from').value||'__/__', to=$('#in-to').value||'__/__', band=$('#in-cities').value;
   let noBand=!!$('#in-cities').dataset.manual&&!band.trim();
@@ -3760,7 +3810,7 @@ async function gridData(g){
 async function renderGrid(gi){
   const g=S.grids[gi]; const c=$('#cv-'+gi); if(!c) return;
   const data=await gridData(g); const T=activate(g);
-  const ctx=c.getContext('2d'); let RR=null; const used=T.kind==='replay'?(RR=renderReplay(ctx,S.assets,T,data),c._hits=RR.hits,RR.used):(c.width!==ART_W&&(c.width=ART_W,c.height=ART_H),renderArt(ctx,S.assets,TPL,data)); if(T.kind!=='replay') c._hits=LHITS; drawSeal(ctx,g); jobChanged();
+  const ctx=c.getContext('2d'); let RR=null; const used=T.kind==='replay'?(RR=renderReplay(ctx,S.assets,T,data),c._hits=RR.hits,RR.used):(c.width!==ART_W&&(c.width=ART_W,c.height=ART_H),renderArt(ctx,S.assets,TPL,data)); if(T.kind!=='replay') c._hits=LHITS; drawSeal(ctx,g); c._stk=drawStickers(ctx,g); jobChanged();
   const tot=SLOT_ORDER.length, mn=tot>=7?tot-2:Math.max(1,tot-1);
   const n=g.items.filter(i=>!i.removed&&i.slot).length, out=g.items.filter(i=>!i.removed&&!i.slot).length, cb=$('#cnt-'+gi);
   if(cb){ cb.hidden=n>=mn&&!out; cb.textContent=out?`${out} produto(s) sem lugar — este modelo tem ${tot} espaços`:`só ${n} produtos — o mínimo desta arte é ${mn}`; }
@@ -3798,7 +3848,8 @@ function gridTplUI(gi){
     ...[['title','Descrição: Iniciais Maiúsculas'],['upper','Descrição: MAIÚSCULAS'],['auto','Descrição: como no PSD']].map(([v,t])=>el('option',{value:v,selected:(g.nameCase||def)===v},t)));
   const sz=el('span',{class:'gsz',title:'Tamanho das descrições de todos os produtos desta arte'},' letra ',fine(0.6,2.2,0.01,g.nameSize||T.nameSize||1,v=>{ g.nameSize=v; try{ localStorage.setItem('ns:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho das descrições',true));
   const pz=T.kind==='replay'?el('span',{class:'gsz',title:'Tamanho dos preços de todos os produtos desta arte'},' preço ',fine(0.6,1.6,0.01,g.priceSize||1,v=>{ g.priceSize=v; try{ localStorage.setItem('ps:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho dos preços',true)):null;
-  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz,ik);
+  const rz=T.kind==='replay'?el('button',{class:'lnk',title:'Arruma de novo, sozinho, as fotos e os preços desta arte (os seus ajustes de tamanho e posição continuam valendo por cima)',onclick:()=>{ g.pins={}; renderSoon(gi); toast('Arte arrumada de novo.'); }},'↺ arrumar de novo'):null;
+  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz,ik,rz);
 }
 // tarja e validade de cada arte (o texto da Proner traz várias campanhas, cada uma com datas e cidades próprias)
 function gridMetaUI(gi){
@@ -3824,7 +3875,19 @@ function gridMetaUI(gi){
         // as outras artes do mesmo tipo (normais / bebidas) que ainda não tinham chamada própria ficam iguais
         S.grids.forEach((o,oi)=>{ if(oi===gi) return; const OT=tplOfGrid(o)||{}; const OD=(o.bebidas&&OT.bebidas&&OT.bebidas.day)||OT.day; if(OD&&OD.key===D.key&&(!o.dayText||o.dayText===was)){ o.dayText=v; n++; renderSoon(oi); } });
         jobChanged(); if(n){ buildGridUI(); toast(`Chamada aplicada também em mais ${n} arte${n>1?'s':''} do mesmo tipo.`); } }}); }
-  return el('div',{class:'gmeta'},dayI?el('span',{},'Chamada'):null,dayI,el('span',{},'Tarja'),b,el('span',{},'válido de'),f,el('span',{},'até'),t,(g.bandOwn||g.valOwn)?reset:null,ss,sp);
+  // selos / imagens soltas por cima da arte
+  const addStk=async v=>{ let s=null;
+    if(v==='file'){ const inp=el('input',{type:'file',accept:'image/*'}); const f=await new Promise(r=>{ inp.onchange=()=>r(inp.files[0]); inp.click(); }); if(!f) return; try{ s=await stkFromFile(f); await stkRemember(s); }catch(e){ toast('Não consegui abrir essa imagem.','err'); return; } }
+    else if(v.startsWith('lib:')){ const L=await stkLib(); s=L[+v.slice(4)]; if(!s) return; s={...s}; }
+    else s={id:v};
+    const n=(g.stk||[]).length; g.stk=[...(g.stk||[]),{...s,x:0.5,y:Math.min(0.9,0.5+n*0.06),w:s.id==='18'?0.13:0.2,r:0}]; buildGridUI(); upd(); toast('Selo colocado no meio da arte: arraste para o lugar. Ctrl + rodinha muda o tamanho, Alt + rodinha gira.'); };
+  const stSel=el('select',{class:'un',title:'Coloca um selo ou uma imagem por cima da arte, sem mexer nos produtos',onchange:e=>{ const v=e.target.value; e.target.value=''; if(v) addStk(v); }},
+    el('option',{value:''},'+ selo / imagem'),...Object.entries(STK_DRAW).map(([k,v])=>el('option',{value:k},v.name)),...Object.entries(SELOS).map(([k,v])=>el('option',{value:k},v.name)),el('option',{value:'file'},'enviar imagem…'));
+  stkLib().then(L=>{ L.forEach((s,i)=>stSel.insertBefore(el('option',{value:'lib:'+i},'enviada: '+(s.name||'imagem')),stSel.lastChild)); });
+  const stList=(g.stk||[]).map((s,i)=>el('span',{class:'stkchip',title:'Arraste na prévia para mover · Ctrl + rodinha: tamanho · Alt + rodinha: girar'},stkName(s),
+    fine(0.03,1.2,0.005,s.w||0.16,v=>{ g.stk=g.stk.map((q,j)=>j===i?{...q,w:v}:q); upd(); },'Tamanho do selo',true),
+    el('button',{class:'lnk',title:'Tirar este selo',onclick:()=>{ g.stk=g.stk.filter((_,j)=>j!==i); buildGridUI(); upd(); }},'✕')));
+  return el('div',{class:'gmeta'},stSel,...stList,dayI?el('span',{},'Chamada'):null,dayI,el('span',{},'Tarja'),b,el('span',{},'válido de'),f,el('span',{},'até'),t,(g.bandOwn||g.valOwn)?reset:null,ss,sp);
 }
 function buildGridUI(){
   const root=$('#grids'); root.innerHTML='';
@@ -3853,10 +3916,12 @@ function previewCanvas(gi){
   const c=el('canvas',{id:'cv-'+gi,width:ART_W,height:ART_H});
   let st=null;
   const pt=ev=>{ const r=c.getBoundingClientRect(); const k=c.width/r.width; return [(ev.clientX-r.left)*k,(ev.clientY-r.top)*k,k]; };
+  const stkAt=(x,y)=>[...(c._stk||[])].reverse().find(h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h)||null;
+  const stkSet=(i,p)=>{ const g=S.grids[gi]; g.stk=g.stk.map((s,j)=>j===i?{...s,...p}:s); };
   const hitAt=(x,y)=>{ const hs=c._hits||[]; const inR=h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h&&(!h.clip||(x>=h.clip.x&&x<=h.clip.x+h.clip.w&&y>=h.clip.y&&y<=h.clip.y+h.clip.h));
     const rv=[...hs].reverse(); return rv.find(h=>h.type==='hlt'&&inR(h))||rv.find(h=>h.type==='lim'&&inR(h))||rv.find(h=>h.type==='price'&&inR(h))||rv.find(h=>h.type==='img'&&inR(h))||null; };
   const itemOf=h=>h&&S.grids[gi].items.find(i=>i.slot===h.k&&!i.removed);
-  c.addEventListener('pointermove',ev=>{ if(st) return; const [x,y]=pt(ev); const h=hitAt(x,y); c.style.cursor=h?'move':'zoom-in'; });
+  c.addEventListener('pointermove',ev=>{ if(st) return; const [x,y]=pt(ev); const h=stkAt(x,y)||hitAt(x,y); c.style.cursor=h?'move':'zoom-in'; });
   // size of what was touched: photo (or one of its images), price or limit
   const hOf=(it,t)=>(it.hadj&&it.hadj[t])||{};
   const setH=(it,t,p)=>{ it.hadj={...(it.hadj||{}),[t]:{...hOf(it,t),...p}}; };
@@ -3869,9 +3934,13 @@ function previewCanvas(gi){
   const P=new Map();   // active pointers (two fingers = pinch to resize)
   c.addEventListener('pointerdown',ev=>{ P.set(ev.pointerId,[ev.clientX,ev.clientY]);
     if(P.size===2&&st&&st.it){ const [a,b]=[...P.values()]; st.pinch={d0:Math.hypot(a[0]-b[0],a[1]-b[1])||1,s0:sOf(st.h,st.it)}; st.moved=true; (()=>{ try{ c.setPointerCapture(ev.pointerId); }catch(_){} })(); return; }
-    const [x,y]=pt(ev); const h=hitAt(x,y); const it=itemOf(h);
+    const [x,y]=pt(ev); const sk=stkAt(x,y);
+    if(sk){ const s0=S.grids[gi].stk[sk.i]; st={x0:ev.clientX,y0:ev.clientY,stk:sk.i,sx:s0.x??0.5,sy:s0.y??0.5,moved:false}; try{ c.setPointerCapture(ev.pointerId); }catch(_){} return; }
+    const h=hitAt(x,y); const it=itemOf(h);
     st={x0:ev.clientX,y0:ev.clientY,h,it,moved:false,base:null}; if(it) (()=>{ try{ c.setPointerCapture(ev.pointerId); }catch(_){} })(); });
   c.addEventListener('pointermove',ev=>{ if(P.has(ev.pointerId)) P.set(ev.pointerId,[ev.clientX,ev.clientY]);
+    if(st&&st.stk!=null){ const [,,k]=pt(ev); if(!st.moved&&Math.hypot(ev.clientX-st.x0,ev.clientY-st.y0)<4) return; st.moved=true;
+      stkSet(st.stk,{x:+(st.sx+(ev.clientX-st.x0)*k/c.width).toFixed(4),y:+(st.sy+(ev.clientY-st.y0)*k/c.height).toFixed(4)}); renderSoon(gi); return; }
     if(!st||!st.it) return;
     if(st.pinch){ if(P.size<2) return; const [a,b]=[...P.values()]; setS(st.h,st.it,st.pinch.s0*Math.hypot(a[0]-b[0],a[1]-b[1])/st.pinch.d0); renderSoon(gi); return; }
     const [,,k]=pt(ev); const dx=(ev.clientX-st.x0)*k, dy=(ev.clientY-st.y0)*k;
@@ -3884,12 +3953,16 @@ function previewCanvas(gi){
       else { const a=it.adj||{s:1,x:0,y:0}; if(!st.base) st.base={x:a.x||0,y:a.y||0}; it.adj={s:1,...a,x:Math.round(st.base.x+dx),y:Math.round(st.base.y+dy)}; } }
     renderSoon(gi); });
   const end=ev=>{ P.delete(ev.pointerId); if(!st) return; if(st.pinch&&P.size) return; const s0=st; st=null;
+    if(s0.stk!=null){ if(s0.moved) jobChanged(); return; }
     if(s0.it){ openRow(gi,s0.it,true); setActiveRow(gi,s0.it); }
     if(s0.moved){ buildRows(gi); setActiveRow(gi,s0.it); renderSoon(gi); }
     else if(s0.it){ buildRows(gi); setActiveRow(gi,s0.it); const r=$(`#row-${gi}-${s0.it.i}`); if(r) r.scrollIntoView({block:'nearest',behavior:'smooth'}); }
     else if(ev.type==='pointerup') openZoom(gi); };
   c.addEventListener('pointerup',end); c.addEventListener('pointercancel',ev=>{ P.delete(ev.pointerId); st=null; });
   c.addEventListener('wheel',ev=>{
+    { const [x,y]=pt(ev); const sk=stkAt(x,y); if(sk&&(ev.ctrlKey||ev.altKey)){ ev.preventDefault(); const s0=S.grids[gi].stk[sk.i];
+        if(ev.altKey&&!ev.ctrlKey) stkSet(sk.i,{r:(((s0.r||0)+(ev.deltaY<0?-3:3)+180)%360+360)%360-180}); else stkSet(sk.i,{w:+Math.max(0.03,Math.min(1.5,(s0.w||0.16)*(ev.deltaY<0?1.04:1/1.04))).toFixed(4)});
+        renderSoon(gi); clearTimeout(c._wt); c._wt=setTimeout(()=>jobChanged(),400); return; } }
     if(ev.altKey&&!ev.ctrlKey){ const [x,y]=pt(ev); const h=hitAt(x,y); const it=itemOf(h); if(!it||!h||h.type!=='img') return; ev.preventDefault();
       const d=ev.deltaY<0?-2:2, n=(it.imgIds||[]).length, sel=n>1?(it.adjSel??-1):-1; const wrap=v=>((v+180)%360+360)%360-180;
       if(sel>=0){ it.iadj=[...(it.iadj||[])]; while(it.iadj.length<n) it.iadj.push(null); const a=it.iadj[sel]||{s:1,x:0,y:0}; it.iadj[sel]={...a,r:wrap((a.r||0)+d)}; }
@@ -4113,7 +4186,7 @@ function choosePick(id){
 
 // ---------- zoom / export ----------
 function openZoom(gi){ const c=$('#cv-'+gi); $('#zoom-img').src=c.toDataURL('image/png'); $('#zoom').showModal(); }
-async function gridBlob(gi){ const g=S.grids[gi]; const c=document.createElement('canvas'); c.width=ART_W; c.height=ART_H; const data=await gridData(g); const T=activate(g); if(T.kind==='replay') renderReplay(c.getContext('2d'),S.assets,T,data); else renderArt(c.getContext('2d'),S.assets,TPL,data); drawSeal(c.getContext('2d'),g); return await new Promise(r=>c.toBlob(r,'image/png')); }
+async function gridBlob(gi){ const g=S.grids[gi]; const c=document.createElement('canvas'); c.width=ART_W; c.height=ART_H; const data=await gridData(g); const T=activate(g); if(T.kind==='replay') renderReplay(c.getContext('2d'),S.assets,T,data); else renderArt(c.getContext('2d'),S.assets,TPL,data); drawSeal(c.getContext('2d'),g); drawStickers(c.getContext('2d'),g); return await new Promise(r=>c.toBlob(r,'image/png')); }
 function dl(blob,name){ const a=el('a',{href:URL.createObjectURL(blob),download:name}); document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},2000); }
 // excluir uma arte inteira (ex.: arte criada a partir de uma linha que não é produto); dá para desfazer
 function deleteGrid(gi){
