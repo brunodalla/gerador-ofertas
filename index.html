@@ -224,6 +224,10 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
 .ck-add>span{flex:none!important}
 @media (max-width:1650px){ #actions>.st{display:none} }
 .gday{max-width:200px}
+.st-link{display:flex;justify-content:flex-end;margin:4px 0 -4px}
+.st-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.st-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.st-n{font-weight:700;white-space:nowrap}
 .btn.sm{padding:5px 10px;font-size:12px}
 .row.ck-err{box-shadow:inset 4px 0 0 var(--bad)} .row.ck-warn{box-shadow:inset 4px 0 0 var(--warn)}
 .row.ck-flash{outline:2px solid var(--or);outline-offset:2px}
@@ -266,6 +270,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
   <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
 <section id="bankview">
+  <div class="st-link"><button class="lnk" id="st-open">Espaço no navegador</button></div>
   <div id="bk-conn" class="step"><h3>Banco de imagens</h3><div class="st">Conecte o banco para ver, buscar, trocar e enviar imagens de produtos.</div>
     <div class="acts"><button class="btn pri desk" id="bk-connect">Abrir pasta do BANCO DE PRODUTOS</button><button class="lnk desk" id="bk-connect2">outra pasta</button><button class="btn" id="bk-google">Entrar com Google</button></div></div>
   <div id="bk-tools" hidden>
@@ -297,6 +302,9 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
   <div id="bku-list"></div>
   <div class="nia"><button class="btn" id="bku-add">+ adicionar mais fotos</button><span style="flex:1"></span><button class="btn" id="bku-cancel">Cancelar</button><button class="btn pri" id="bku-save">Salvar no banco</button></div></div></dialog>
 <datalist id="day-sugg"><option value="de quinta a sábado"><option value="de quinta a domingo"><option value="de sexta a sábado"><option value="de sexta a domingo"><option value="de sábado a domingo"></datalist>
+<dialog id="storage"><div style="padding:16px 18px;width:min(760px,94vw)"><h3 style="margin:0 0 4px">Espaço no navegador</h3>
+  <div class="st" id="st-sum"></div><div id="st-list" class="st-list"></div><div class="st" id="st-ram"></div>
+  <div class="nia"><span style="flex:1"></span><button class="btn pri" id="st-close">Fechar</button></div></div></dialog>
 <dialog id="conf"><div style="padding:16px 18px;width:min(980px,95vw)">
   <div class="ck-head"><h3 style="margin:0">Conferente</h3><div id="ck-sum" class="ck-sum"></div><span style="flex:1"></span>
     <div id="ck-filter" class="ck-filter"><button data-f="prob" class="on">Erros e avisos</button><button data-f="all">Tudo</button></div></div>
@@ -2540,7 +2548,8 @@ function bvGroups(items){ const g=new Map(); for(const it of items){ const k=bvK
 function bvShow(on){
   document.body.classList.toggle('bankmode',on);
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',(b.dataset.tab==='bank')===on));
-  if(on) bvRender(); window.scrollTo(0,0);
+  if(on) bvRender(); else { for(const v of BV.thumbs.values()) Promise.resolve(v).then(b=>b&&b.close&&b.close()); BV.thumbs.clear(); $('#bk-grid').innerHTML=''; }
+  window.scrollTo(0,0);
 }
 function bvList(){
   const usage=bvUsage(), newer=bvGroups(S.lib.items);
@@ -2967,7 +2976,7 @@ function ckList(){
     for(const list of byIt.values()){ const r0=list[0]; const it=r0.it;
       const lvl=list.some(r=>r.lvl==='err')?'err':list.some(r=>r.lvl==='warn')?'warn':'info';
       const th=el('canvas',{width:72,height:72,class:'ck-th'}); const imgId=(list.find(r=>r.img)||{}).img||(it&&it.imgIds&&it.imgIds[0]);
-      if(imgId) getImage(imgId).then(im=>{ if(!im) return; const x=th.getContext('2d'); const s=Math.min(68/im.width,68/im.height); x.drawImage(im,(72-im.width*s)/2,(72-im.height*s)/2,im.width*s,im.height*s); });
+      if(imgId) (S.lib.byId.get(imgId)?bvThumb(S.lib.byId.get(imgId)):getImage(imgId)).then(im=>{ if(!im) return; const x=th.getContext('2d'); const s=Math.min(68/im.width,68/im.height); x.drawImage(im,(72-im.width*s)/2,(72-im.height*s)/2,im.width*s,im.height*s); });
       const msgs=el('div',{class:'ck-msgs'});
       for(const r of list) msgs.append(el('div',{class:'ck-m '+r.lvl},el('span',{class:'ck-dot'}),el('span',{},r.msg),
         r.fix?el('button',{class:'btn sm',onclick:()=>ckFix(r)},'Usar "'+r.fix.name+'"'):null,
@@ -2998,6 +3007,70 @@ function ckInit(){
   $('#btn-check').onclick=ckOpen; $('#ck-close').onclick=()=>$('#conf').close(); $('#ck-again').onclick=ckRefresh;
   document.querySelectorAll('#ck-filter button').forEach(b=>b.onclick=()=>{ CK.filter=b.dataset.f; ckList(); });
 }
+
+// ---------- Espaço no navegador: quanto o Gerador (ofertas + vídeos) guarda e limpeza ----------
+const ST_CATS=[
+  {p:'th:',     nome:'Miniaturas do banco de imagens', obs:'Refaz sozinho quando precisa. Pode apagar sem medo.', acao:'Apagar todas'},
+  {p:'manual:', nome:'Fotos coladas à mão nas ofertas', obs:'Só apaga as que nenhum trabalho salvo usa mais.', acao:'Apagar as que não são usadas'},
+  {p:'vjob:',   nome:'Vídeos salvos (com as fotos dos produtos)', obs:'Apaga os vídeos com mais de 30 dias. O último aberto fica.', acao:'Apagar os de mais de 30 dias'},
+  {p:'tts:',    nome:'Locuções já geradas (ElevenLabs)', obs:'Guardadas para não gastar créditos de novo. Apagando, as que precisar são geradas outra vez (gasta créditos).', acao:'Apagar todas'},
+  {p:'job:',    nome:'Trabalhos de ofertas', obs:'Apaga os trabalhos com mais de 90 dias. A cópia no Drive/pasta "Ofertas anteriores" continua.', acao:'Apagar os de mais de 90 dias'},
+  {p:'video:handoff', nome:'Produtos enviados para o vídeo', obs:'Só o último envio. É refeito ao clicar em "Gerar vídeo".', acao:'Apagar'},
+];
+function stSize(v,seen){ if(v==null) return 0; if(v instanceof Blob) return v.size; if(v instanceof ArrayBuffer) return v.byteLength; if(ArrayBuffer.isView(v)) return v.byteLength;
+  if(typeof v==='string') return v.length*2; if(typeof v!=='object') return 8; seen=seen||new Set(); if(seen.has(v)) return 0; seen.add(v);
+  let n=0; for(const k in v) n+=k.length*2+stSize(v[k],seen); return n; }
+function stFmt(b){ return b>=1073741824?(b/1073741824).toFixed(1).replace('.',',')+' GB':b>=1048576?(b/1048576).toFixed(0)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+async function stScan(){
+  const db=await IDB.open(); const out=new Map(ST_CATS.map(c=>[c.p,{n:0,sz:0,keys:[]}])); out.set('*',{n:0,sz:0,keys:[]});
+  await new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').openCursor(); q.onsuccess=()=>{ const c=q.result; if(!c) return res();
+      const k=String(c.key); const cat=ST_CATS.find(x=>k.startsWith(x.p)); const o=out.get(cat?cat.p:'*'); const sz=stSize(c.value);
+      o.n++; o.sz+=sz; o.keys.push({k,sz,at:c.value&&typeof c.value==='object'&&!(c.value instanceof Blob)?(c.value.at||c.value.savedAt||c.value.t||0):0}); c.continue(); };
+    q.onerror=()=>res(); });
+  let est=null; try{ est=await navigator.storage.estimate(); }catch(e){}
+  return {cats:out,est};
+}
+async function stOpen(){
+  const d=$('#storage'); $('#st-list').innerHTML='Contando…'; d.showModal(); await stRender();
+}
+async function stRender(){
+  const {cats,est}=await stScan(); const box=$('#st-list'); box.innerHTML='';
+  const total=[...cats.values()].reduce((a,o)=>a+o.sz,0);
+  if(est&&est.quota) $('#st-sum').textContent=`O navegador está usando ${stFmt(est.usage||0)} de ${stFmt(est.quota)} disponíveis para este site · o Gerador guarda ${stFmt(total)}.`;
+  else $('#st-sum').textContent=`O Gerador guarda ${stFmt(total)} neste navegador.`;
+  for(const c of ST_CATS){ const o=cats.get(c.p); if(!o.n) continue;
+    const b=el('button',{class:'btn sm',onclick:async()=>{ b.disabled=true; b.textContent='Apagando…'; const n=await stClean(c.p,o.keys); toast(n?`${n} ${n===1?'item apagado':'itens apagados'}.`:'Nada para apagar aqui.'); await stRender(); }},c.acao);
+    box.append(el('div',{class:'st-row'},el('div',{},el('b',{},c.nome),el('div',{class:'st'},c.obs)),el('div',{class:'st-n'},`${o.n} · ${stFmt(o.sz)}`),b)); }
+  const o=cats.get('*'); if(o.n) box.append(el('div',{class:'st-row'},el('div',{},el('b',{},'Outros (configurações, pastas escolhidas, memória)'),el('div',{class:'st'},'Pequeno, não precisa apagar.')),el('div',{class:'st-n'},`${o.n} · ${stFmt(o.sz)}`),el('span',{})));
+  const ram=performance&&performance.memory?performance.memory.usedJSHeapSize:0;
+  $('#st-ram').textContent=`Na memória agora: ${S.imgCache.size} fotos abertas`+(ram?` · ${stFmt(ram)} usados por esta aba`:'')+'.';
+}
+async function stClean(p,keys){
+  let del=[];
+  if(p==='th:'||p==='tts:'||p==='video:handoff') del=keys.map(x=>x.k);
+  if(p==='vjob:'){ const last=await IDB.get('vjob.last'); const lim=Date.now()-30*DAY; del=keys.filter(x=>x.k!=='vjob:'+last&&(x.at||0)<lim).map(x=>x.k); }
+  if(p==='job:'){ const lim=Date.now()-90*DAY; const cur='job:'+S.sheetName; del=keys.filter(x=>x.k!==cur&&x.at&&x.at<lim).map(x=>x.k); }
+  if(p==='manual:'){ // as que algum trabalho ainda usa ficam
+    const used=new Set(); for(const g of S.grids) for(const it of g.items) for(const id of it.imgIds||[]) used.add(id);
+    for(const k of await IDB.keys('job:')){ const j=await IDB.get(k); const walk=v=>{ if(typeof v==='string'){ if(v.startsWith('manual:')) used.add(v); } else if(v&&typeof v==='object') for(const x of Object.values(v)) walk(x); }; walk(j); }
+    for(const m of Object.values(MEM)) for(const id of (m&&m.imgs)||[]) used.add(id);
+    del=keys.map(x=>x.k).filter(k=>!used.has(k)); }
+  if(p==='tts:'&&del.length&&!confirm(`Apagar ${del.length} locuções guardadas? As que você usar de novo serão geradas outra vez no ElevenLabs (gasta créditos).`)) return 0;
+  for(const k of del) await IDB.del(k);
+  if(p==='th:'){ for(const v of BV.thumbs.values()) Promise.resolve(v).then(b=>b&&b.close&&b.close()); BV.thumbs.clear(); }
+  return del.length;
+}
+// aviso automático quando o espaço do site está quase cheio
+async function stCheck(){ try{ const e=await navigator.storage.estimate(); if(e.quota&&e.usage/e.quota>0.8) toast('O espaço do navegador para o Gerador está quase cheio. Abra "Espaço no navegador" (aba Banco de imagens) para liberar.','err'); }catch(e){} }
+
+// ---------- memória (RAM): não guardar fotos grandes demais nem fotos que ninguém está usando ----------
+const IMG_MAX=1800, IMG_KEEP=40; const IMG_USE=new Map();
+function imgTouch(id){ IMG_USE.set(id,Date.now()); if(S.imgCache.size<=IMG_KEEP+10) return;
+  const inUse=new Set(); for(const g of S.grids) for(const it of g.items) for(const x of it.imgIds||[]) inUse.add(x);
+  const old=[...S.imgCache.keys()].filter(k=>!inUse.has(k)).sort((a,b)=>(IMG_USE.get(a)||0)-(IMG_USE.get(b)||0));
+  for(const k of old.slice(0,Math.max(0,S.imgCache.size-IMG_KEEP))){ S.imgCache.delete(k); IMG_USE.delete(k); } }
+function imgShrink(c){ if(!c||!c.width) return c; const m=Math.max(c.width,c.height); if(m<=IMG_MAX) return c;
+  const s=IMG_MAX/m, o=document.createElement('canvas'); o.width=Math.round(c.width*s); o.height=Math.round(c.height*s); const x=o.getContext('2d'); x.imageSmoothingQuality='high'; x.drawImage(c,0,0,o.width,o.height); return o; }
 
 // ---------- Google Drive pela conta Google (funciona em qualquer navegador e no celular) ----------
 // O app usa a API do Drive com o login Google do próprio usuário. As pastas do Drive viram "pastas" iguais às do
@@ -3573,11 +3646,12 @@ async function addLibraryFromFiles(files){
 }
 function libByName(name){ return S.lib.items.find(i=>i.name===name); }
 async function getImage(id){
+  if(typeof imgTouch==='function') imgTouch(id);
   if(S.imgCache.has(id)) return S.imgCache.get(id);
   const p=(async()=>{
-    if(id.startsWith('manual:')){ const blob=await IDB.get(id); if(!blob) return null; return trimCanvas(await createImageBitmap(blob)); }
+    if(id.startsWith('manual:')){ const blob=await IDB.get(id); if(!blob) return null; return imgShrink(trimCanvas(await createImageBitmap(blob))); }
     const it=S.lib.byId.get(id); if(!it) return null;
-    try{ return await decodeImageFile(it.file||await it.handle.getFile()); }catch(e){ console.warn(e); toast('Não consegui abrir a imagem: '+it.name,'err'); return null; }
+    try{ return imgShrink(await decodeImageFile(it.file||await it.handle.getFile())); }catch(e){ console.warn(e); toast('Não consegui abrir a imagem: '+it.name,'err'); return null; }
   })();
   S.imgCache.set(id,p); p.then(r=>{ if(!r&&S.imgCache.get(id)===p) S.imgCache.delete(id); });   // never remember a failure (bank may load later)
   return p;
@@ -4029,7 +4103,7 @@ async function pickerSearch(){
   }
   // load thumbs progressively
   const btns=[...box.querySelectorAll('.cand')];
-  for(let i=0;i<res.length;i++){ if(my!==pickerSearch.seq) return; const im=await getImage(res[i].item.id); if(!im) continue; const c=btns[i].querySelector('canvas'); const x=c.getContext('2d'); const s=Math.min(150/im.width,150/im.height); x.drawImage(im,(150-im.width*s)/2,(150-im.height*s)/2,im.width*s,im.height*s); }
+  for(let i=0;i<res.length;i++){ if(my!==pickerSearch.seq) return; const im=S.lib.byId.get(res[i].item.id)?await bvThumb(res[i].item):await getImage(res[i].item.id); if(!im) continue; const c=btns[i].querySelector('canvas'); const x=c.getContext('2d'); const s=Math.min(150/im.width,150/im.height); x.drawImage(im,(150-im.width*s)/2,(150-im.height*s)/2,im.width*s,im.height*s); }
 }
 pickerSearch.seq=0;
 function choosePick(id){
@@ -4149,7 +4223,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   $('#ni-sharp').onchange=()=>NI&&runRemoval(NI.mode);
   for(const id of ['ni-bri','ni-con']) $('#'+id).oninput=()=>{ cancelAnimationFrame(applyBC.r); applyBC.r=requestAnimationFrame(applyBC); };
   $('#ni-bcr').onclick=()=>{ $('#ni-bri').value=0; $('#ni-con').value=0; applyBC(); };
-  bvInit(); ckInit(); $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
+  bvInit(); ckInit(); $('#st-open').onclick=stOpen; $('#st-close').onclick=()=>$('#storage').close(); setTimeout(stCheck,4000); $('#ni-save').onclick=saveNewImage; $('#ni-ps').onclick=queuePhotoshop; $('#ni-cancel').onclick=()=>{ $('#newimg').close(); NI=null; };
   $('#file-lib2').onchange=e=>addLibraryFromFiles(e.target.files);
   for(const id of ['in-cities','in-from','in-to']) $('#'+id).addEventListener('input',()=>{ if(id!=='in-cities') autoBand();
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
