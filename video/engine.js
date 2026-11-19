@@ -8,7 +8,7 @@ export const SR=48000;
 export const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export function parseMoney(v){ if(v==null||v==='') return null; if(typeof v==='number') return v; const s=String(v).replace(/[^\d,.\-]/g,''); if(!s) return null; const t=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s; const n=parseFloat(t); return isFinite(n)?n:null; }
 export function splitPrice(v){ const c=Math.round(v*100); return {int:String(Math.floor(c/100)), cents:String(c%100).padStart(2,'0')}; }
-export function precoFalado(v){ const p=splitPrice(v); return p.cents==='00'?`${p.int} reais`:`${p.int} e ${p.cents}`; }
+export function precoFalado(v){ const p=splitPrice(v); if(+p.int===0) return `${+p.cents} centavos`; return p.cents==='00'?`${p.int} reais`:`${p.int} e ${p.cents}`; }
 export function precoTela(v){ const p=splitPrice(v); return `R$ ${p.int},${p.cents}`; }
 const lowerFirst=s=>s.charAt(0).toUpperCase()+s.slice(1);
 // nome do produto como a voz lê melhor (as mesmas trocas que o Bruno faz à mão)
@@ -106,7 +106,17 @@ export function buildTimeline(model,items,voices,music,opts={}){
   const mStart=introTemTrilha?parts[0].end:0;
   const songStart=introTemTrilha?(model.intro.musicaDesde+parts[0].end):model.trilha.inicio;
   let mus=null;
-  if(music&&model.trilha.ateAssina){
+  if(music&&model.trilha.todoVideo){
+    // intro e assinatura sem trilha própria (Baratão): a trilha toca do começo ao fim do vídeo, por baixo de tudo
+    const at=model.trilha.atraso||0;
+    mus=planMusic(model.trilha,model.trilha.inicio||0,T-tm.fimFolga-at,at);
+    if(mus.extra>0.001){
+      const n=parts.filter(p=>p.type==='oferta').length||1; let shift=0;
+      for(const p of parts){ p.start=snap(p.start+shift); if(p.voice&&p.type!=='intro') p.voice.at+=shift; if(p.type==='oferta') shift+=mus.extra/n; p.end=snap(p.end+shift); }
+      T=parts[parts.length-1].end;
+      mus=planMusic(model.trilha,model.trilha.inicio||0,T-tm.fimFolga-at,at);
+    }
+  } else if(music&&model.trilha.ateAssina){
     // trilha só por baixo das ofertas (Baratão): começa no fim da intro e para no corte da assinatura
     const fim=parts[parts.length-1].start, len=Math.max(0,fim-mStart);
     mus={pieces:[{from:songStart,to:Math.min(songStart+len,model.trilha.fimArquivo||1e9),at:mStart,ending:true}],extra:0,stopAt:fim};
@@ -137,12 +147,12 @@ export function planMusic(m,songStart,length,offset=0){
   const pieces=[]; let bodyLen;
   const natural=m.finalCompasso-songStart;
   if(Lb<=natural){
-    const k=Math.floor((natural-Lb)/bar+1e-6); const end=m.finalCompasso-k*bar;
+    const k=Math.floor((natural-Lb)/bar+0.02); const end=m.finalCompasso-k*bar;
     pieces.push({from:songStart,to:end,at:offset}); bodyLen=end-songStart;
   } else {
     pieces.push({from:songStart,to:m.finalCompasso,at:offset}); let at=natural, rem=Lb-natural; const loop=m.finalCompasso-m.loopDe;
     while(rem>loop+1e-6){ pieces.push({from:m.loopDe,to:m.finalCompasso,at:offset+at}); at+=loop; rem-=loop; }
-    const k=Math.floor((loop-rem)/bar+1e-6); const end=m.finalCompasso-k*bar;
+    const k=Math.floor((loop-rem)/bar+0.02); const end=m.finalCompasso-k*bar;
     pieces.push({from:m.loopDe,to:end,at:offset+at}); bodyLen=at+(end-m.loopDe);
   }
   pieces.push({from:m.finalCompasso,to:m.fimArquivo,at:offset+bodyLen,ending:true});
@@ -251,7 +261,7 @@ export function productBoxes(img,it={},L=null,cfg=null){
   if(Array.isArray(img)) return productBoxesMulti(img,it,L,cfg);
   const ar=img.width/img.height, n=Math.max(1,Math.min(3,it.copias|0||1));
   // cópias de um produto largo (caixa de bombom): uma em cima da outra, como as fotos diferentes
-  if(n>1&&arranjoDe([img],it)==='pilha') return productBoxesMulti(Array(n).fill(img),it,L,cfg);
+  if(n>1&&(arranjoDe([img],it)==='pilha'||(n===3&&it.arranjo==='grupo'))) return productBoxesMulti(Array(n).fill(img),it,L,cfg);
   const step=0.62;                                   // quanto cada cópia anda para o lado (em larguras)
   const spanW=1+(n-1)*step;                          // largura total em larguras de um produto
   const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};
@@ -269,8 +279,11 @@ export function productBoxes(img,it={},L=null,cfg=null){
 // da outra; garrafas e embalagens altas ficam lado a lado. it.arranjo: 'auto' | 'lado' | 'pilha'
 export function arranjoDe(imgs,it={}){
   if(it.arranjo==='lado'||it.arranjo==='pilha') return it.arranjo;
+  if(it.arranjo==='grupo') return imgs.length===3?'grupo':'lado';
   const ars=imgs.map(i=>i.width/i.height), m=ars.reduce((a,b)=>a+b,0)/ars.length;
-  return m>1.15?'pilha':'lado';
+  if(m>1.15) return 'pilha';
+  // três pacotes "quadrados" (amendoim, café): em grupo, dois atrás e um na frente, maiores que numa fila
+  return imgs.length===3&&m>=0.6?'grupo':'lado';
 }
 function productBoxesMulti(imgs,it={},L=null,cfg=null){
   const C=cfg||{cx:540,topo:900,base:1880,maxW:880,area:400000};
@@ -283,6 +296,15 @@ function productBoxesMulti(imgs,it={},L=null,cfg=null){
     let y=cy-unitH*w/2;
     const boxes=imgs.map((img,i)=>{ const h=w/ars[i]; const b={i,k:i,img,x:cx-w/2,y,w,h}; y+=h*(i<n-1?ov:1); return b; });
     return {cx,cy,boxes};
+  }
+  if(arranjoDe(imgs,it)==='grupo'){
+    // a 2ª foto na frente, no meio e mais baixa; a 1ª atrás à esquerda e a 3ª atrás à direita (mesma ordem da arte)
+    const b=0.9, a=(ars[0]*b+ars[2]*b)/2, af=ars[1];
+    const unitW=(a+af)*0.52+a*b, unitH=b/2+0.42+0.5;
+    let h=Math.min(boxH/unitH,C.maxW/unitW,Math.sqrt(C.area*1.7/unitW)); h*=it.esc||1;
+    const d=(a+af)*0.26*h, yb=cy-unitH*h/2+b*h/2, yf=yb+0.42*h;
+    const mk=(i,x,y,s,k)=>{ const w=ars[i]*h*s, hh=h*s; return {i,k,img:imgs[i],x:x-w/2,y:y-hh/2,w,h:hh}; };
+    return {cx,cy,boxes:[mk(0,cx-d,yb,b,2),mk(2,cx+d,yb,b,1),mk(1,cx,yf,1,0)]};
   }
   const ov=0.88;                                                // cada foto anda 88% da largura da anterior
   const unitW=ars.reduce((s,a,i)=>s+(i<n-1?a*ov:a),0);         // largura total para altura 1

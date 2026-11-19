@@ -131,7 +131,7 @@ function renderItems(){
       rng('Para cima / baixo','dy',-350,350,5,0,sg),
       rng('Para os lados','dx',-300,300,5,0,sg),
       el('label',{class:'f'},'Cópias',el('select',{onchange:e=>{ it.copias=+e.target.value; saveJob(); renderItems(); }},...[1,2,3].map(n=>{ const o=el('option',{value:n},n===1?'1 (só ele)':n+' cópias'); if((it.copias||1)===n) o.selected=true; return o; }))),
-      (nf>1||(it.copias|0)>1)?el('label',{class:'f'},nf>1?'Fotos':'Arrumar cópias',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado']].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
+      (nf>1||(it.copias|0)>1)?el('label',{class:'f'},nf>1?'Fotos':'Arrumar cópias',el('select',{title:'Como arrumar as fotos diferentes',onchange:e=>{ it.arranjo=e.target.value; saveJob(); drawPreview(it,pv); }},...[['auto','Automático'],['pilha','Uma em cima da outra'],['lado','Lado a lado'],...((nf===3||(nf<=1&&(it.copias|0)===3))?[['grupo','Em grupo (2 atrás, 1 na frente)']]:[])].map(([v,t])=>{ const o=el('option',{value:v},t); if((it.arranjo||'auto')===v) o.selected=true; return o; }))):null,
       el('b',{class:'ctlh'},'Preço e texto'),
       rng('Tamanho','tEsc',0.6,1.6,0.02,1,pc),
       rng('Para cima / baixo','tDy',-400,400,5,0,sg),

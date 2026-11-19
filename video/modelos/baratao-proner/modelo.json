@@ -8,8 +8,7 @@
   "intro": {
     "src": "intro.mp4",
     "dur": 5.1,
-    "audio": "intro.mp3",
-    "musicaDesde": -0.795
+    "audio": "intro.mp3"
   },
   "fundo": {
     "src": "fundo.mp4",
@@ -30,14 +29,15 @@
   },
   "trilha": {
     "src": "trilha.mp3",
-    "ateAssina": true,
-    "inicio": 4.35,
+    "inicio": 0,
     "bpm": 96.48,
     "finalCompasso": 104.505,
     "para": 109.6,
     "loopDe": 9.98,
     "fimArquivo": 110.5,
-    "ganho": 0.2
+    "ganho": 0.2,
+    "todoVideo": true,
+    "atraso": 0.795
   },
   "voz": {
     "nome": "Leonardo Hamaral",
