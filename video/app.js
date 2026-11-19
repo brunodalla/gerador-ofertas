@@ -84,7 +84,7 @@ function itemFalado(it){ return it.falado||FALADO[E.norm(it.name)]||E.nomeFalado
 const fotosDe=it=>[it.img,...(it.fotos||[])].filter(Boolean);
 const fechaImg=p=>Promise.resolve(p).then(v=>{ for(const b of [].concat(v||[])) try{ b.close(); }catch(e){} }).catch(()=>{});
 const clearImg=it=>{ for(const k of [...V.imgs.keys()]) if(String(k).startsWith(it.id+':')){ fechaImg(V.imgs.get(k)); V.imgs.delete(k); } };
-function limpaImgs(){ for(const p of V.imgs.values()) fechaImg(p); limpaImgs(); }
+function limpaImgs(){ for(const p of V.imgs.values()) fechaImg(p); V.imgs.clear(); }
 async function itemImg(it){
   const fs=fotosDe(it); if(!fs.length) return null;
   const key=it.id+':'+fs.length;
