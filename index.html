@@ -1317,15 +1317,17 @@ function fillCopies(imgs,box){
 }
 // LHITS: clickable areas of the last render (drag the photo / price / limit on the preview, Ctrl+wheel to resize)
 let LHITS=[], LNAMESIZE=1;
+function ghostCtx(){ return ghostCtx.c||(ghostCtx.c=document.createElement('canvas').getContext('2d')); }
 function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
+  const LATE_IMG=[], LATE_LIM=[];
   const X=c.x, Y=c.y, skin=T.skin, INKSEL=(item&&item.ink)||LEG_INK, dark=INKSEL?lum(INKSEL)>0.5:lum(c.color||'#ffffff')<(T.darkLum||0.56), ink=INKSEL||(dark?'#fff':INK), hlc=lum(T.hlColor||ORANGE)<0.45?ORANGE:(T.hlColor||ORANGE);
   const adj=item.adj||null, AJ=adj||{};
   const nz=LNAMESIZE*(AJ.ns||1);
   const cell={x:c.x,y:c.y,w:c.w,h:c.h};
   const fit=(ims,box)=>{ if(adj&&(adj.s!==1||adj.x||adj.y)){ const s=adj.s||1; box={x:box.x+box.w*(1-s)/2+(adj.x||0),y:box.y+box.h*(1-s)/2+(adj.y||0),w:box.w*s,h:box.h*s}; }
-    ctx.save(); ctx.beginPath(); ctx.rect(c.x,c.y,c.w,c.h); ctx.clip();
-    const r=drawImageFit(ctx,(grown||variant==='simpleBig')?fillCopies(ims,box):ims,box,{maxUp:adj&&adj.s>1?3*adj.s:3,iadj:item.iadj,rot:(adj&&adj.r)||0});
-    ctx.restore();
+    const _im=(grown||variant==='simpleBig')?fillCopies(ims,box):ims, _op={maxUp:adj&&adj.s>1?3*adj.s:3,iadj:item.iadj,rot:(adj&&adj.r)||0};
+    const r=drawImageFit(ghostCtx(),_im,box,_op);
+    LATE_IMG.push(()=>{ ctx.save(); ctx.beginPath(); ctx.rect(c.x,c.y,c.w,c.h); ctx.clip(); drawImageFit(ctx,_im,box,_op); ctx.restore(); });
     if(r) LHITS.push({k:slot,type:'img',x:r.x0,y:r.y0,w:r.x1-r.x0,h:r.y1-r.y0,rects:r.rects,clip:cell});
     return r; };
   // price group: scale (ps) around its anchor + move (px,py); fn returns its untransformed box
@@ -1335,7 +1337,8 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   // limit + tags ("EXCETO ZERO LACTOSE"): boxes stacked, moved/scaled together (ls,lx,ly)
   // row=true: highlight boxes side by side to the left of the limit (big cells); otherwise stacked under it
   // limit (ls,lx,ly) and each highlight box (hadj) have their own controls; default: boxes beside (row) or under the limit
-  const limGroup=(x,y,k0=1,row=false)=>{ if(!lim&&!tags.length) return null; const ls=(AJ.ls||1)*k0, lx=AJ.lx||0, ly=AJ.ly||0;
+  const limGroup=(...a)=>{ LATE_LIM.push(()=>limGroup0(...a)); return null; };
+  const limGroup0=(x,y,k0=1,row=false)=>{ if(!lim&&!tags.length) return null; const ls=(AJ.ls||1)*k0, lx=AJ.lx||0, ly=AJ.ly||0;
     let lh=0;
     if(lim){ ctx.save(); ctx.translate(x+lx,y+ly); ctx.scale(ls,ls); const lb=drawLimit(ctx,A,lim,0,0,hlc,dark,c.color); ctx.restore(); lh=lb.h;
       LHITS.push({k:slot,type:'lim',x:x+lx,y:y+ly,w:199*ls,h:lb.h*ls}); }
@@ -1355,6 +1358,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
   if(!flex&&c.big&&!/Big$/.test(variant)) variant=item.club?'clubBig':'simpleBig';
   if(!c.big&&/Big$/.test(variant)) variant=chooseVariant(c,item,imgs,skin);
   if(!flex&&skin==='igu'&&variant==='clubSmall2'&&!c.tall) variant='clubSmall1';
+  if(!flex&&skin!=='igu'&&variant==='clubSmall2'&&c.w<340) variant='clubSmall1';
   if(flex) variant=(item.club?'club':'simple')+{left:'Small1',right:'Right',above:'Small2',below:'Below'}[flex];
   const notes=item.notes||(item.note?[item.note]:[]);
   const lim=notes.find(n=>/LIMITE|PRE[CÇ]O DO KG/i.test(n))||null;
@@ -1432,7 +1436,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
     limGroup(X+c.w-209,Y+16,1,true);
   } else if(variant==='clubSmall1'){
     if(skin==='igu'){ fit(imgs,{x:X+192,y:Y+90,w:c.w-198,h:c.h-98}); stack(X+12,Y+56+dy*0.6,0.69); }
-    else { fit(imgs,{x:X+198,y:Y+88,w:c.w-206,h:c.h-96}); stack(X+5,Y+55,0.668,[0,141]); }
+    else { fit(imgs,c.w<340?{x:X+140,y:Y+150,w:c.w-148,h:c.h-158}:{x:X+198,y:Y+88,w:c.w-206,h:c.h-96}); stack(X+5,Y+55,0.668,[0,141]); }
     limGroup(X+c.w-10-199*0.62,Y+10,0.62);
   } else if(variant==='clubSmall2'){
     if(skin==='igu'){ const sc=Math.min(0.85,(c.w-24)/262); const top=Y+60*sc+6; stack(X+(c.w-258*sc)/2,top+20,sc); const by=top+20+304*sc+8; fit(imgs,{x:X+12,y:by,w:c.w-24,h:Y+c.h-8-by}); }
@@ -1470,6 +1474,7 @@ function renderSlot(ctx,A,T,slot,item,imgs,forced,c,grown){
     if(hasL) limGroup(X+c.w-209,top); else if(item.club) limGroup(X+c.w-10-199*0.62,Y+c.h-10-118*0.62,0.62);
     fit(imgs,{x:X+16,y:top,w:c.w-32-(hasL?200:0),h:Y+c.h-8-top});
   }
+  for(const f of LATE_IMG) f(); for(const f of LATE_LIM) f();
   return variant;
 }
 
@@ -1534,7 +1539,9 @@ function footerLines(ctx,T,from,to){
   // longer month names ("novembro" vs "agosto") must not run into the logo: rewrap within the template width
   // (never more lines than the template), and whatever still doesn't fit is shrunk by drawFixedText
   const lim=maxW*1.03;
-  if(lines.some(l=>ctx.measureText(l).width>lim)){ const w=wrapLines(ctx,lines.join(' '),fam,f.size,f.track,lim); if(w.length<=Math.max(orig.length,lines.length)) lines=w; }
+  if(lines.some(l=>ctx.measureText(l).width>lim)){ const maxL=Math.max(orig.length,lines.length); let sz=f.size, w;
+    for(;;){ w=wrapLines(ctx,lines.join(' '),fam,sz,f.track,lim); if(w.length<=maxL||sz<=f.size*0.72) break; sz-=0.5; }
+    lines=w; if(sz<f.size) lines.size=sz; }
   lines.maxW=lim;
   return lines;
 }
@@ -1598,7 +1605,7 @@ function renderArt(ctx,A,T,data){
   }
   // tarja e rodapé (por cima da grade)
   if(V.band&&!data.noBand){ const bs={...V.band}; if(bs.align==='center'&&!bs.maxW) bs.maxW=1040; drawFixedText(ctx,bs,[data.band||bandText(V,null,v.from,v.to)]); }
-  { const fl=data.footer?data.footer.split('\n'):footerLines(ctx,V,v.from,v.to); drawFixedText(ctx,fl.maxW&&V.foot?{...V.foot,maxW:fl.maxW}:V.foot,fl); }
+  { const fl=data.footer?data.footer.split('\n'):footerLines(ctx,V,v.from,v.to); drawFixedText(ctx,fl.maxW&&V.foot?{...V.foot,maxW:fl.maxW,size:fl.size||V.foot.size}:V.foot,fl); }
   const used={};
   for(const k of SLOT_ORDER){ const s=data.slots[k]; const c=L.cells[k]; if(s&&s.item&&c){ const d=cellOf(T,T.slots[k].units); ctx.save(); ctx.beginPath(); ctx.rect(c.x,c.y,c.w,c.h); ctx.clip();   /* nada do produto passa para fora do quadro */
       used[k]=renderSlot(ctx,A,V,k,s.item,s.imgs,s.variant,c,c.w!==d.w||c.h!==d.h); ctx.restore(); } }
@@ -2175,8 +2182,9 @@ function drawGridCell(ctx,A,T,cell,item,imgs,ss,k){
   if(PINS&&PINS.grid){ const sg=(imgs||[]).map(im=>im.width+'x'+im.height).join(',')+'|'+[cell.x,cell.y,cell.w,cell.h].map(Math.round).join(','); const pin=PINS.grid.cells[k];
     if(pin&&pin.sig===sg&&pin.box) best=pin.box; else if(best) PINS.grid.cells[k]={sig:sg,box:{x:best.x,y:best.y,w:best.w,h:best.h}}; }
   ctx.save(); ctx.beginPath(); ctx.rect(cell.x,cell.y,cell.w,cell.h); ctx.clip();
-  const dr=best?drawProductImgs(ctx,imgs,adjBox(best,item.adj),false,'bottom',item.iadj,null,(item.adj&&item.adj.r)||0):null;
-  BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; stampHlts(ctx,A,item,k,gm.w,cell,lumC(bg));
+  const _ia=best?[imgs,adjBox(best,item.adj),false,'bottom',item.iadj,null,(item.adj&&item.adj.r)||0]:null;
+  const dr=_ia?drawProductImgs(ghostCtx(),..._ia):null;
+  BGL=lumC(bg); STAMP_END=null; drawStamp(ctx,A,st,item,sx,sy,s); BGL=null; if(_ia) drawProductImgs(ctx,..._ia); stampHlts(ctx,A,item,k,gm.w,cell,lumC(bg));
   if(dr) HITS.push({k,type:'img',x:dr.x0,y:dr.y0,w:dr.x1-dr.x0,h:dr.y1-dr.y0,rects:dr.rects,clip:cell});
   HITS.push({k,type:'price',x:ex0,y:ey0,w:gm.w,h:gm.h});
   ctx.restore();
