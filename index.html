@@ -2114,7 +2114,29 @@ function colorCells(cells,G){
     const order=[pal[c.par],pal[1-c.par],pal[2],pal[3]]; c.col=order.find(col=>!nb.some(x=>same(x,col)))||pal[c.par]; });
   return cells;
 }
-function gridCells(n,G,Z){ return colorCells(gridCells0(n,G,Z),G); }
+function gridCells(n,G,Z,form){ const F=gridForms(n,G,Z); gridCells.count=F.length; return colorCells(F[(form||0)%F.length],G); }
+// FORMAÇÕES da grade: outras maneiras de dividir a mesma área para a mesma quantidade de produtos (botão "▦ formação").
+// Sempre numa malha: as divisas coincidem de uma linha para a outra; um quadro pode ocupar 2 colunas (deitado), a linha
+// inteira, ou 2 linhas (em pé). A primeira é a automática de sempre.
+function gridForms(n,G,Z){
+  const def=gridCells0(n,G,Z), out=[def]; if(n<2) return out;
+  const W=Z[2]-Z[0], H=Z[3]-Z[1], g=G.gutter||0, R0=G.recipes.simple||G.recipes.club, ar0=R0.cell[0]/R0.cell[1];
+  const key=cs=>cs.map(c=>[c.x,c.y,c.w,c.h].join(',')).sort().join('|'); const seen=new Set([key(def)]); const cand=[];
+  const spansOf=(C,m,flip)=>{ if(m===C) return Array(C).fill(1); if(m===1) return [C]; const d=C-m; if(d>m||d<0) return null; const sp=Array(m).fill(1); for(let k=0;k<d;k++) sp[flip?m-1-k:k]=2; return sp; };
+  const build=(C,parts,flip0,tr)=>{ const R=parts.length, A=tr?H:W, B=tr?W:H, cw=(A-g*(C-1))/C, ch=(B-g*(R-1))/R, cells=[];
+    for(let r=0;r<R;r++){ const sp=spansOf(C,parts[r],(r%2===1)!==flip0); if(!sp) return null; let c=0;
+      for(const w of sp){ const a0=Math.round(c*(cw+g)), a1=Math.round((c+w-1)*(cw+g)+cw), b0=Math.round(r*(ch+g)), b1=Math.round(r*(ch+g)+ch);
+        cells.push(tr?{x:Z[0]+b0,y:Z[1]+a0,w:b1-b0,h:a1-a0,par:(r+c)%2,tall:w>1}:{x:Z[0]+a0,y:Z[1]+b0,w:a1-a0,h:b1-b0,par:(r+c)%2,wide:w>1}); c+=w; } }
+    return cells.sort((p,q)=>p.y-q.y||p.x-q.x); };
+  const add=cs=>{ if(!cs||cs.length!==n) return; if(cs.some(c=>c.w/c.h>3.3||c.h/c.w>2.7||c.w<210||c.h<210)) return; const k=key(cs); if(seen.has(k)) return; seen.add(k);
+    const v=cs.reduce((a,c)=>a+Math.abs(Math.log((c.w/c.h)/ar0)),0)/n; const uni=cs.every(c=>Math.abs(c.w-cs[0].w)<3&&Math.abs(c.h-cs[0].h)<3); cand.push({cs,v:v-(uni?10:0)}); };   // grades iguais (2×3, 3×2…) vêm primeiro
+  for(let C=1;C<=4;C++){ const ok=[]; for(let m=1;m<=C;m++) if(m===C||m===1||C-m<=m) ok.push(m);
+    const rec=(left,parts)=>{ if(parts.length>5) return; if(left===0){ if(parts.length) for(const fl of [false,true]) for(const tr of [false,true]) add(build(C,parts,fl,tr)); return; }
+      for(const m of ok) if(m<=left) rec(left-m,[...parts,m]); };
+    rec(n,[]); }
+  cand.sort((a,b)=>a.v-b.v); for(const c of cand.slice(0,11)) out.push(c.cs);
+  return out;
+}
 function gridCells0(n,G,Z){
   const W=Z[2]-Z[0], H=Z[3]-Z[1], g=G.gutter||0;
   const R0=G.recipes.simple||G.recipes.club; const ar0=R0.cell[0]/R0.cell[1];
@@ -2381,7 +2403,7 @@ function renderReplay(ctx,A,T,data){
   const kind=data.kind||(T.grid&&Object.keys(data.slots).length>4?'grid':'capa');
   const entries=SLOT_ORDER.filter(k=>data.slots[k]&&data.slots[k].item).map(k=>({k,item:data.slots[k].item,imgs:data.slots[k].imgs}));
   const Z=zoneOf(T,bd,kind==='grid'&&T.grid?'grid':'capa',!!data.band);
-  if(kind==='grid'&&T.grid){ const cells=gridCells(entries.length,T.grid,Z);
+  if(kind==='grid'&&T.grid){ const cells=gridCells(entries.length,T.grid,Z,data.form);
     if(T.grid.gutterCol){ ctx.fillStyle=hexOf(T.grid.gutterCol); ctx.fillRect(Z[0],Z[1],Z[2]-Z[0],Z[3]-Z[1]); }
     let s=gridScale(ctx,T,cells,entries);
     // GRADE PRESA: o tamanho dos preços da arte e o lugar de cada foto ficam guardados; só mudam quando muda a grade (número de produtos, quadros) ou a foto
@@ -3383,7 +3405,7 @@ function sigOf(g){
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
-  grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
+  grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,form:g.form||0,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
 async function openJobsDialog(){
@@ -3424,7 +3446,7 @@ async function openSavedJob(name,job){
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
-  S.grids=job.grids.map(jg=>({label:jg.label||'',extra:!!jg.extra,tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
+  S.grids=job.grids.map(jg=>({label:jg.label||'',extra:!!jg.extra,form:jg.form||0,tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
     savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
     validity:jg.validity||{from:job.from||'',to:job.to||''},
     // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
@@ -3449,7 +3471,7 @@ function updateSaveState(){
   const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
-  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.dayText=jg.dayText||null; g.pins=jg.pins||{legacy:true}; g.stk=jg.stk||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
+  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.dayText=jg.dayText||null; g.pins=jg.pins||{legacy:true}; g.stk=jg.stk||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; g.form=jg.form||0; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
   $('#in-cities').value=job.citiesOff?'':(job.cities||$('#in-cities').value); if(job.citiesOff) $('#in-cities').dataset.manual='1'; $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
 }
 function changed(it){ const o=it.orig||{}; return it.name!==o.name||it.price!==o.price||it.club!==o.club||it.unit!==o.unit||it.raw!==it.raw0; }
@@ -3898,7 +3920,7 @@ async function gridData(g){
   const slots={};
   for(const it of g.items){ if(!it.slot||it.removed) continue; const imgs=await imgsFor(it); slots[it.slot]={item:{name:it.name,unit:it.unit,price:it.price,club:it.club,note:it.note,notes:it.notes,punit:it.punit,cunit:it.cunit,adj:it.adj,iadj:it.iadj,namePos:it.namePos,sh:it.sh,hlt:it.hlt,hadj:it.hadj},imgs,variant:it.variant||undefined}; }
   const T=activate(g);
-  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize,ink:g.ink,pins:(g.pins||(g.pins={}))}; }
+  if(T&&T.kind==='replay'){ const v={from:(g.gvalidity&&g.gvalidity.from)||$('#in-from').value||'__/__',to:(g.gvalidity&&g.gvalidity.to)||$('#in-to').value||'__/__'}; return {kind:g.kind,bd:g.bd,title:g.title||g.label,band:g.band,validity:v,slots,nameCase:g.nameCase,nameSize:g.nameSize||T.nameSize,priceSize:g.priceSize,ink:g.ink,form:g.form||0,pins:(g.pins||(g.pins={}))}; }
   const bev=!!(g.bebidas&&TPL.bebidas);
   let from=$('#in-from').value||'__/__', to=$('#in-to').value||'__/__', band=$('#in-cities').value;
   let noBand=!!$('#in-cities').dataset.manual&&!band.trim();
@@ -3948,7 +3970,9 @@ function gridTplUI(gi){
   const sz=el('span',{class:'gsz',title:'Tamanho das descrições de todos os produtos desta arte'},' letra ',fine(0.6,2.2,0.01,g.nameSize||T.nameSize||1,v=>{ g.nameSize=v; try{ localStorage.setItem('ns:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho das descrições',true));
   const pz=T.kind==='replay'?el('span',{class:'gsz',title:'Tamanho dos preços de todos os produtos desta arte'},' preço ',fine(0.6,1.6,0.01,g.priceSize||1,v=>{ g.priceSize=v; try{ localStorage.setItem('ps:'+T.id,v); }catch(_){} renderSoon(gi); },'Tamanho dos preços',true)):null;
   const rz=T.kind==='replay'?el('button',{class:'lnk',title:'Arruma de novo, sozinho, as fotos e os preços desta arte (os seus ajustes de tamanho e posição continuam valendo por cima)',onclick:()=>{ g.pins={}; renderSoon(gi); toast('Arte arrumada de novo.'); }},'↺ arrumar de novo'):null;
-  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz,ik,rz);
+  const fz=(T.kind==='replay'&&T.grid&&g.kind==='grid')?el('button',{class:'lnk',title:'Troca a divisão dos quadros desta arte: uns deitados, outros em pé, mais colunas ou mais linhas. Clique de novo para ver a próxima; Shift+clique volta para a anterior.',
+    onclick:async e=>{ const n=gridCells.count||1; g.form=(((g.form||0)+(e.shiftKey?-1:1))%n+n)%n; if(g.pins) delete g.pins.grid; await renderGrid(gi); const c=gridCells.count||1; g.form=(g.form||0)%c; toast(g.form?`Formação ${g.form+1} de ${c}. Clique de novo para ver a próxima.`:`Formação automática (1 de ${c}).`); jobChanged(); }},'▦ formação'):null;
+  return el('span',{class:'gtpl'},ts,ks,bs,cs,sz,pz,ik,rz,fz);
 }
 // tarja e validade de cada arte (o texto da Proner traz várias campanhas, cada uma com datas e cidades próprias)
 function gridMetaUI(gi){
