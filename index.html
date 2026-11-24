@@ -1649,7 +1649,7 @@ function daysOfValidity(v){ const out=new Set(); const a=dateOf(v&&v.from), b=da
   const names=['DOMINGO','SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO']; for(let d=new Date(a);d<=b&&out.size<7;d.setDate(d.getDate()+1)) out.add(names[d.getDay()]); return out; }
 // dias no topo da arte ("SEXTA A DOMINGO DO"): 1 dia "SEXTA DO", 2 dias "SEXTA E SÁBADO DO", 3 ou mais "SEXTA A DOMINGO DO".
 // Vale a validade da arte; sem datas, os dias escritos no título; sem nada, o texto original do fundo.
-function dayPhrase(bd,title,validity){
+function bdDayPhrase(bd,title,validity){
   const N=['DOMINGO','SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO']; let seq=[];
   const a=dateOf(validity&&validity.from), b=dateOf(validity&&validity.to)||a;
   if(a){ for(let d=new Date(a);d<=b&&seq.length<7;d.setDate(d.getDate()+1)) seq.push(N[d.getDay()]); }
@@ -1658,7 +1658,7 @@ function dayPhrase(bd,title,validity){
   if(!seq.length) return bd.day.text;
   return (seq.length===1?seq[0]:seq.length===2?seq[0]+' E '+seq[1]:seq[0]+' A '+seq[seq.length-1])+' DO';
 }
-function drawBdDay(ctx,bd,title,validity){ const D=bd&&bd.day; if(!D) return; const t=dayPhrase(bd,title,validity);
+function drawBdDay(ctx,bd,title,validity){ const D=bd&&bd.day; if(!D) return; const t=bdDayPhrase(bd,title,validity);
   ctx.save(); setFont(ctx,"'"+D.font+"'",D.size,0); const w=ctx.measureText(t).width; if(w>D.maxW) setFont(ctx,"'"+D.font+"'",D.size*D.maxW/w,0);
   ctx.fillStyle=D.col; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText(t,D.cx,D.base); ctx.restore(); }
 // pick the backdrop: same kind of art, same header day words, band state
