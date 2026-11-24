@@ -269,7 +269,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
     </div>
   </div>
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
-  <div id="actions" hidden><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
+  <div id="actions" hidden><button class="btn" id="btn-addgrid" title="Cria mais uma arte neste trabalho, com o mesmo modelo, tarja e validade da última">+ Nova arte</button><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
 <section id="bankview">
   <div class="st-link"><button class="lnk" id="st-open">Espaço no navegador</button></div>
@@ -3102,7 +3102,7 @@ function ckList(){
 function ckAddLine(line,gi){ const p=parseItemLine(ckPre(line).replace(/\s\|\s/g,' ')); if(!p){ toast('Não consegui ler essa linha; inclua pelo + Produto.','err'); return; }
   const g=S.grids[gi]; const i=Math.max(-1,...g.items.map(x=>x.i))+1;
   const it={...p,i,raw0:p.raw,name:fixAccents(p.name),imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:p.name,price:p.price,club:p.club,unit:p.unit}};
-  activate(g); it.slot=freeSlot(g); g.items.push(it); autoPickImages(it); buildRows(gi); renderSoon(gi); jobChanged();
+  g.items.push(it); activate(g); if(!it.slot) it.slot=freeSlot(g); autoPickImages(it); buildRows(gi); renderSoon(gi); jobChanged();
   toast(it.slot?`Incluído na arte ${gi+1} (posição ${it.slot}).`:`Incluído, mas a arte ${gi+1} está cheia: escolha a posição.`, it.slot?'':'err'); ckRefresh(); }
 function ckRefresh(){ ckRun(); ckList(); ckMarkAll(); }
 function ckFix(r){ const it=r.it, gi=r.gi; const ids=[...it.imgIds]; ids[r.fix.pos]=r.fix.id; if(it.rot){ delete it.rot[r.fix.pos]; } it.imgIds=ids; it.conf='mem'; remember(it,{imgs:it.imgIds,rot:it.rot||{}}); buildRows(gi); renderSoon(gi); toast('Imagem trocada.'); ckRefresh(); }
@@ -3348,7 +3348,7 @@ function sigOf(g){
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
-  grids:S.grids.map(g=>({label:g.label,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
+  grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
 async function openJobsDialog(){
@@ -3389,7 +3389,7 @@ async function openSavedJob(name,job){
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
-  S.grids=job.grids.map(jg=>({label:jg.label||'',tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
+  S.grids=job.grids.map(jg=>({label:jg.label||'',extra:!!jg.extra,tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
     savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
     validity:jg.validity||{from:job.from||'',to:job.to||''},
     // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
@@ -3468,7 +3468,7 @@ function unremoveItem(gi,it){ const g=S.grids[gi]; it.removed=false; it.slot=fre
 function addItem(gi){
   const g=S.grids[gi]; const i=Math.max(-1,...g.items.map(x=>x.i))+1;
   const it={i,raw:'',raw0:'',name:'',unit:'UND',price:null,club:null,note:'',imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:'',price:null,club:null,unit:'UND'}};
-  it.slot=freeSlot(g); g.items.push(it); openRow(gi,it,true); buildRows(gi); renderSoon(gi);
+  g.items.push(it); activate(g); if(!it.slot) it.slot=freeSlot(g); openRow(gi,it,true); buildRows(gi); renderSoon(gi);
   if(!it.slot) toast(`A arte já tem ${SLOT_ORDER.length} produtos: tire um produto ou troque a posição deste.`,'err');
   setTimeout(()=>{ const t=$(`#row-${gi}-${i} textarea`); if(t){ t.focus(); t.scrollIntoView({block:'center'}); } },50);
 }
@@ -3827,9 +3827,12 @@ async function applySheet(sh,name,replayFile,forced,reload){
   $('#in-from').value=sh.validity?sh.validity.from:''; $('#in-to').value=sh.validity?sh.validity.to:'';
   autoBand(true);
   const job=await IDB.get('job:'+name); let resumed=false;
+  if(job&&job.grids&&!loadSheetBuffer.fresh){ const nb=job.grids.findIndex(g=>g.extra), ex=nb<0?[]:job.grids.slice(nb);   // artes extras (criadas pelo "+ Nova arte") vêm depois das da planilha
+    if(ex.length&&ex.every(g=>g.extra)&&nb===S.grids.length) for(const jg of ex){ if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
+      S.grids.push({label:jg.label||'ARTE EXTRA',items:[],cities:sh.cities,bebidas:!!jg.bebidas,gvalidity:jg.gvalidity||null,validity:jg.validity||(sh.validity?{...sh.validity}:{from:'',to:''}),tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,band:jg.band||'',bandOwn:!!jg.bandOwn,valOwn:!!jg.valOwn,bd:null,title:jg.title||'',extra:true}); } }
   if(job&&job.grids&&job.grids.length===S.grids.length&&!loadSheetBuffer.fresh){ restoreJob(job); resumed=true; if(job.src&&job.src.changes) S.src.changes=job.src.changes; S.ckIgnore=job.ckIgnore||[];
     // destaques vêm sempre da planilha; trabalhos salvos antes desta versão têm as posições refeitas
-    S.grids.forEach((g,gi)=>{ const hk=new Set(sh.grids[gi].items.filter(x=>x.hl).map(x=>keyOf(x.raw)));
+    S.grids.forEach((g,gi)=>{ const hk=new Set(((sh.grids[gi]||{}).items||[]).filter(x=>x.hl).map(x=>keyOf(x.raw)));
       g.items.forEach(it=>{ if(!it.added) it.hl=hk.has(keyOf(it.raw0)); });
       activate(g);
       if((job.v||1)<2||g.items.some(i=>i.slot&&!SLOT_ORDER.includes(i.slot))){ const act=g.items.filter(i=>!i.removed); const sl=autoAssign(act); act.forEach(i=>i.slot=''); for(const [k,i] of Object.entries(sl)) i.slot=k; } else fixHlSlots(g.items,TPL);
@@ -4251,6 +4254,15 @@ function openZoom(gi){ const c=$('#cv-'+gi); $('#zoom-img').src=c.toDataURL('ima
 async function gridBlob(gi){ const g=S.grids[gi]; const c=document.createElement('canvas'); c.width=ART_W; c.height=ART_H; const data=await gridData(g); const T=activate(g); if(T.kind==='replay') renderReplay(c.getContext('2d'),S.assets,T,data); else renderArt(c.getContext('2d'),S.assets,TPL,data); drawSeal(c.getContext('2d'),g); drawStickers(c.getContext('2d'),g); return await new Promise(r=>c.toBlob(r,'image/png')); }
 function dl(blob,name){ const a=el('a',{href:URL.createObjectURL(blob),download:name}); document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},2000); }
 // excluir uma arte inteira (ex.: arte criada a partir de uma linha que não é produto); dá para desfazer
+// arte extra no mesmo trabalho: copia modelo, tarja, validade e ajustes de letra da arte de referência (a última) e começa com um produto em branco
+function addGrid(from){
+  const src=S.grids[from!=null?from:S.grids.length-1]; if(!src) return;
+  const g={label:'ARTE EXTRA',items:[],cities:src.cities||'',bebidas:!!src.bebidas,gvalidity:src.gvalidity?{...src.gvalidity}:null,validity:src.validity?{...src.validity}:{from:'',to:''},
+    tpl:src.tpl,kind:src.kind||null,band:src.band||'',bandOwn:!!src.bandOwn,valOwn:!!src.valOwn,bd:null,title:src.title||'',nameCase:src.nameCase,nameSize:src.nameSize,priceSize:src.priceSize,ink:src.ink,seal:null,dayText:src.dayText||null,pins:{},stk:[],extra:true};
+  S.grids.push(g); const gi=S.grids.length-1; OPEN.clear(); buildGridUI(); addItem(gi); renderAll(); jobChanged(); updateSaveState();
+  setTimeout(()=>{ const c=$('#grid-'+gi); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },80);
+  toast(`Arte ${gi+1} criada com o mesmo modelo da anterior. Inclua os produtos pelo "+ Produto".`);
+}
 function deleteGrid(gi){
   const g=S.grids[gi]; if(!g) return;
   S.grids.splice(gi,1); OPEN.clear(); reindexPS(); buildGridUI(); renderAll(); jobChanged(); updateSaveState();
@@ -4364,7 +4376,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
     S.grids.forEach((g,gi)=>{ const m=$('#grid-'+gi+' .gmeta'); if(m) m.replaceWith(gridMetaUI(gi)); });   // Proner/Bigolin/Destak: the fixed "tarja" goes to every art without its own
     renderSoon(); });
-  $('#btn-save').onclick=saveAll; $('#btn-dlall').onclick=downloadAll; $('#btn-video').onclick=()=>sendToVideo();
+  $('#btn-save').onclick=saveAll; $('#btn-dlall').onclick=downloadAll; $('#btn-addgrid').onclick=()=>addGrid(); $('#btn-video').onclick=()=>sendToVideo();
   $('#file-rev').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(!S.grids.length){ toast('Abra primeiro a planilha original.','err'); return; } if(f) applyRevision(f); };
   $('#rev-close').onclick=()=>$('#revision').close();
   $('#btn-chg').onclick=()=>{ if(!S.grids.length){ toast('Abra primeiro a planilha.','err'); return; } $('#chg-text').value=''; $('#chg-list').innerHTML=''; $('#changes').showModal(); $('#chg-text').focus(); };
