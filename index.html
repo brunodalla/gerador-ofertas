@@ -270,11 +270,11 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
         <label>Válido de<input id="in-from" placeholder="dd/mm"></label>
         <label>até<input id="in-to" placeholder="dd/mm"></label>
       </div>
-      <div class="fields desk" style="grid-template-columns:1fr"><label>Salvar as artes em (dentro de ELEMENTOS)<input id="in-out" value=""></label></div>
+      <div class="fields desk" style="grid-template-columns:1fr"><label>Artes prontas vão para (pasta do Google Drive; clique para trocar)<input id="in-out" value="" readonly style="cursor:pointer"></label></div>
     </div>
   </div>
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
-  <div id="actions" hidden><button class="btn" id="btn-addgrid" title="Cria mais uma arte neste trabalho, com o mesmo modelo, tarja e validade da última">+ Nova arte</button><button class="btn" id="btn-chg">Colar alterações do cliente (WhatsApp)</button><label class="btn">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
+  <div id="actions" hidden><button class="btn" id="btn-addgrid" title="Cria mais uma arte neste trabalho, com o mesmo modelo, tarja e validade da última">+ Nova arte</button><button class="btn" id="btn-chg">Colar alterações</button><label class="btn" style="display:none">Aplicar planilha corrigida<input type="file" id="file-rev" accept=".xlsx" hidden></label><span class="st">O trabalho fica salvo sozinho; ao salvar de novo, as artes alteradas substituem os mesmos arquivos.</span><button class="btn ck-btn" id="btn-check" title="Confere preços, descrições, imagens, limites e observações com a planilha ou o texto que o cliente mandou">Conferir</button><button class="btn" id="btn-dlall" title="Baixa todas as artes em PNG para o computador">Baixar todas (PNG)</button><button class="btn" id="btn-video" title="Abre a página de vídeo com os produtos deste trabalho">Gerar vídeo deste trabalho</button><button class="btn pri" id="btn-save">Salvar todas as artes</button></div>
 </main>
 <section id="bankview">
   <div class="st-link"><button class="lnk" id="st-open">Espaço no navegador</button></div>
@@ -333,7 +333,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
     <label class="nm2">Salvar no banco com o nome<input id="ni-name"></label>
     <div class="nia"><button class="btn" id="ni-ps" title="Manda a foto original para o Photoshop recortar com o 'Remover plano de fundo' dele">Recortar no Photoshop</button><span style="flex:1"></span><button class="btn" id="ni-cancel">Cancelar</button><button class="btn pri" id="ni-save" disabled>Salvar no banco e usar</button></div>
   </div></dialog>
-<dialog id="changes"><div style="padding:16px 18px;width:min(760px,92vw)"><h3 style="margin:0 0 6px">Alterações do cliente</h3><div class="st">Copie a mensagem do WhatsApp e cole aqui. Confira o que o app entendeu e desmarque o que não quiser aplicar.</div>
+<dialog id="changes"><div style="padding:16px 18px;width:min(760px,92vw)"><h3 style="margin:0 0 6px">Alterações do cliente</h3><div class="st">Cole aqui o que o cliente mandou (WhatsApp, e-mail, Word). Confira o que o app entendeu e desmarque o que não quiser aplicar. O que ele não conseguir fazer sozinho fica marcado no produto como "a fazer".</div>
 <textarea id="chg-text" rows="7" style="width:100%;margin:10px 0;font:14px/1.4 inherit" placeholder="ALTERAÇÃO DETONA PREÇO&#10;Substituir presunto por APRESUNTADO COZIDO PERDIGÃO (FATIADO) 200G.........4,99&#10;Preço chopp 12,99"></textarea>
 <div id="chg-list" class="chglist"></div><div class="nia"><button class="btn" id="chg-cancel">Cancelar</button><button class="btn pri" id="chg-apply">Aplicar marcadas</button></div></div></dialog>
 <dialog id="pastetxt"><div style="padding:16px 18px;width:min(760px,92vw)"><h3 style="margin:0 0 6px">Colar texto das ofertas</h3><div class="st">Cole a mensagem do jeito que o cliente mandou (WhatsApp, e-mail…). Cada título com data ou "EXCLUSIVA …" vira uma arte; "Clube Paga", "Limite" e as cidades são entendidos sozinhos.</div>
@@ -3393,7 +3393,7 @@ function saveClientId(){ const v=$('#gs-id').value.trim(); if(!/\.apps\.googleus
 
 // ---------- celular: compartilhar as artes (WhatsApp) ----------
 const canShareFiles=()=>{ try{ return !!(navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'a.png',{type:'image/png'})]})); }catch(e){ return false; } };
-function artFileName(gi){ const g=S.grids[gi]; return safeFileName((g.savedAs||'').replace(/\.png$/i,'')||`${(g.label||'arte').slice(0,40)} ${gi+1}`)+'.png'; }
+function artFileName(gi){ const g=S.grids[gi]; let b=''; try{ b=outInfo(gi).base; }catch(e){} return safeFileName((g.savedAs||'').replace(/\.png$/i,'')||`${b||(g.label||'arte').slice(0,40)} - ${gi+1}`)+'.png'; }
 async function shareGrids(gis){
   const files=[]; for(const gi of gis) files.push(new File([await gridBlob(gi)],artFileName(gi),{type:'image/png'}));
   try{ await navigator.share({files}); return true; }
@@ -3410,7 +3410,7 @@ function sigOf(g){
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
 function jobSnapshot(){ const CR=JOB.created||(JOB.created={}); return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),created:CR[S.sheetName]||(CR[S.sheetName]=Date.now()),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
-  grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,form:g.form||0,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
+  grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,form:g.form||0,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedIn:g.savedIn||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
 async function openJobsDialog(){
@@ -3499,7 +3499,7 @@ async function openSavedJob(name,job){
   await setTemplate(T0.id);
   for(const jg of job.grids) if(jg.tpl&&window.TPLS[jg.tpl]) await ensureBases(window.TPLS[jg.tpl]);
   S.grids=job.grids.map(jg=>({label:jg.label||'',extra:!!jg.extra,form:jg.form||0,tpl:(jg.tpl&&window.TPLS[jg.tpl])?jg.tpl:T0.id,kind:jg.kind||null,bd:jg.bd||null,nameCase:jg.nameCase||undefined,nameSize:jg.nameSize||undefined,priceSize:jg.priceSize||undefined,ink:jg.ink||undefined,seal:jg.seal||null,dayText:jg.dayText||null,pins:jg.pins||{legacy:true},stk:jg.stk||null,
-    savedAs:jg.savedAs||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
+    savedAs:jg.savedAs||null,savedIn:jg.savedIn||null,savedSig:jg.savedSig||null,band:jg.band||(!jg.bandOwn&&/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')&&storeOf((jg.label||'').toUpperCase())?'OFERTA VÁLIDA SOMENTE PARA '+storeOf((jg.label||'').toUpperCase()):''),bandOwn:jg.bandOwn!=null?!!jg.bandOwn:!!(jg.band||/EXCLUSIV|SOMENTE PARA/i.test(jg.label||'')),valOwn:jg.valOwn!=null?!!jg.valOwn:!!jg.gvalidity,title:jg.title||jg.label||'',gvalidity:jg.gvalidity||null,bebidas:!!jg.bebidas,cities:jg.cities||job.cities||'',
     validity:jg.validity||{from:job.from||'',to:job.to||''},
     // datas e tarja próprias da arte (ex.: grid de bebidas válido até domingo) voltam junto com o trabalho
     gvalidity:jg.gvalidity||null,valOwn:!!(jg.valOwn||jg.gvalidity),bandOwn:!!jg.bandOwn,bebidas:!!(jg.bebidas||/BEBIDA/i.test(jg.label||'')),title:jg.title||'',cities:jg.cities||'',
@@ -3516,14 +3516,15 @@ function updateSaveState(){
   let dirty=0;
   S.grids.forEach((g,gi)=>{
     const b=$('#sv-'+gi); if(!b) return;
-    const d=!g.savedAs||g.savedSig!==sigOf(g); if(d) dirty++;
-    b.textContent=!g.savedAs?'ainda não salva':d?`alterada · salvar de novo (${g.savedAs})`:`salva como ${g.savedAs} ✓`;
-    b.className='badge '+(!g.savedAs?'':d?'warn':'ok');
+    const d=needsSave(gi), novo=!g.savedAs||(!g.savedIn&&d&&g.savedSig===sigOf(g)); if(d) dirty++;
+    b.textContent=novo?'ainda não salva':d?`alterada · salvar de novo (${g.savedAs})`:`salva como ${g.savedAs} ✓`;
+    b.title=g.savedIn?'Na pasta do Drive: '+g.savedIn.replace(/\//g,' › '):'';
+    b.className='badge '+(novo?'':d?'warn':'ok');
   });
   const bt=$('#btn-save'); const send=!S.dir&&document.body.classList.contains('mobile')&&typeof canShareFiles==='function'&&canShareFiles(); if(bt) bt.textContent=dirty?(send?`Enviar artes (${dirty})`:`Salvar artes (${dirty})`):(send?'Tudo enviado ✓':'Tudo salvo ✓');
 }
 function restoreJob(job){
-  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.dayText=jg.dayText||null; g.pins=jg.pins||{legacy:true}; g.stk=jg.stk||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; g.form=jg.form||0; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
+  S.grids.forEach((g,gi)=>{ const jg=job.grids[gi]; if(!jg) return; g.savedAs=jg.savedAs; g.savedIn=jg.savedIn||null; g.dayText=jg.dayText||null; g.pins=jg.pins||{legacy:true}; g.stk=jg.stk||null; g.savedSig=jg.savedSig; g.items=jg.items.map(ji=>({...ji})); if(jg.tpl&&window.TPLS[jg.tpl]) g.tpl=jg.tpl; if(jg.kind) g.kind=jg.kind; if(jg.bd) g.bd=jg.bd; if(jg.nameCase) g.nameCase=jg.nameCase; if(jg.nameSize) g.nameSize=jg.nameSize; if(jg.priceSize) g.priceSize=jg.priceSize; g.form=jg.form||0; if(jg.ink) g.ink=jg.ink; if(jg.seal) g.seal=jg.seal; if(jg.valOwn&&jg.gvalidity){ g.gvalidity=jg.gvalidity; g.valOwn=true; } if(jg.bandOwn){ g.band=jg.band||''; g.bandOwn=true; } });
   $('#in-cities').value=job.citiesOff?'':(job.cities||$('#in-cities').value); if(job.citiesOff) $('#in-cities').dataset.manual='1'; $('#in-from').value=job.from||''; $('#in-to').value=job.to||'';
 }
 function changed(it){ const o=it.orig||{}; return it.name!==o.name||it.price!==o.price||it.club!==o.club||it.unit!==o.unit||it.raw!==it.raw0; }
@@ -3632,74 +3633,116 @@ function sameCampaign(header){
   const n=new Set(tokens(S.sheetName||'')); return [...h].some(t=>n.has(t));
 }
 function parseChanges(text){
-  const acts=[]; let other=false, header='';
-  const L=[]; for(const ln of text.split(/\n+/)){ const t=ln.trim(); if(L.length&&/\b(POR|PELO|PELA|PARA)\s*[:.]?$/i.test(L[L.length-1])&&t) L[L.length-1]+=' '+t; else L.push(t); }
+  const acts=[]; let other=false, header='', mode='';
+  const L=[]; for(const ln of text.split(/\n+/)){ const t=ln.trim(); if(L.length&&/\b(POR|PELO|PELA)\s*[:.]?$/i.test(L[L.length-1])&&t) L[L.length-1]+=' '+t; else L.push(t); }
+  const TODO_STOP=/\b(AJUSTAR|AJUSTE|ARRUMAR|CORRIGIR|ALTERAR|MUDAR|TROCAR|COLOCAR|DEIXAR|TIRAR|VERIFICAR|CONFERIR|AUMENTAR|DIMINUIR|DESCRI[CÇ][AÃ]O|IMAGEM|FOTO|PRE[CÇ]O|FICOU|FICAR|EST[AÁ]|ERRAD[OA]|POR|CIMA|BAIXO|LADO|MAIOR|MENOR|TAMB[EÉ]M|FAVOR|PARA|COM|SEM|QUE|NO|NA|DO|DA|DE|O|A|OS|AS|UM|UMA|E)\b/gi;
   for(let line of L){
-    line=line.replace(/[*_~]/g,'').replace(/^\s*\[?\d{1,2}:\d{2}.*?\]\s*/,'').replace(/^[^:]{0,40}:\s(?=\S)/,m=>/PRE[CÇ]O|SUBST|TIRAR|INCLU/i.test(m)?m:'').replace(/\s+/g,' ').trim();
+    line=line.replace(/[*_~]/g,'').replace(/^\s*\[?\d{1,2}:\d{2}.*?\]\s*/,'').replace(/^[^:]{0,40}:\s(?=\S)/,m=>/PRE[CÇ]O|SUBST|TIRAR|INCLU|FALT/i.test(m)?m:'').replace(/\s+/g,' ').trim();
     if(!line||/^\d{1,2}:\d{2}\s*(AM|PM)?$/i.test(line)||/^~|\+\d{2}\s?\d{2}/.test(line)) continue;
-    if(/^ALTERA[CÇ]/i.test(line)){ header=line; other=!sameCampaign(line); continue; }
-    const U=line.toUpperCase(); let a=null, m;
-    if((m=/^(?:SUBSTITUIR|TROCAR)\s+(.+?)\s+(?:POR|PELO|PELA)\s+(.+)$/i.exec(line))){
-      const p=nums(m[2]); const nn=m[2].replace(NUM_RX,'').replace(/[.…]{2,}|R\$/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
-      a={type:'replace',target:m[1],name:nn,price:p[0]??null,club:p[1]??null};
+    const U=line.toUpperCase(), hasNum=nums(line).length>0; let a=null, m;
+    // cabeçalho de campanha: "ALTERAÇÃO DETONA PREÇO", "IGUATEMI E SHOP ESTOK ALTERAÇÃO FINAL DE SEMANA"
+    if(!hasNum&&/\bALTERA[CÇ][AÃ]O\b|\bALTERA[CÇ][OÕ]ES\b/i.test(line)&&line.split(' ').length<=12){ header=line; other=!sameCampaign(line); mode=''; continue; }
+    // "ITENS FALTANTES HORTI", "INCLUIR:" -> as linhas de produto que vierem embaixo entram como produtos novos
+    if(!hasNum&&/^(ITENS?|ITEM|PRODUTOS?)\s+(FALTANTES?|FALTANDO|NOVOS?|A\s+INCLUIR|PARA\s+INCLUIR|ADICIONAIS|EXTRAS?)\b|^(INCLUIR|ADICIONAR|ACRESCENTAR|FALTOU|FALTARAM|FALTANDO|FALTANTES?)\b[^,.]{0,40}:?$/i.test(line)){ mode='add'; continue; }
+    if(!hasNum&&/^OFERTAS?\s+V[AÁ]LIDAS?\b/i.test(line)){
+      const v=/\d/.test(line)?parseValidity(normDates(line)):null;
+      if(v){ a={type:'validity',from:v.from,to:v.to}; }
+      else if((m=/^OFERTAS?\s+V[AÁ]LIDAS?\s+(?:SOMENTE\s+|APENAS\s+|S[OÓ]\s+)?(?:PARA|EM|NAS?|NOS?)\s+(.+)$/i.exec(line))) a={type:'cities',text:line.replace(/[.\s]+$/,'')};
+      if(a){ a.line=line; a.other=other; a.header=header; acts.push(a); continue; }
+    }
+    const itemOf=t=>{ const p=parseItemLine(ckPre(String(t).replace(/(?<![Rr])\$\s*(?=\d)/g,'')).replace(/\s\|\s/g,' ')); return p&&p.name?p:null; };
+    if((m=/^(?:.{0,40}?[,:]\s*)?(?:SUBSTITUIR|TROCAR|AJUSTAR|ALTERAR|MUDAR)\s+(?:A\s+|O\s+|AS\s+|OS\s+)?(.+?)\s+(?:TAMB[EÉ]M\s+)?(?:POR|PELO|PELA)\s*:?\s+(.+)$/i.exec(line))&&nums(m[2]).length){
+      const p=itemOf(m[2]); const nn=p?p.name.toUpperCase():m[2].replace(NUM_RX,'').replace(/[.…]{2,}|R\$|\$/g,' ').replace(/\s+/g,' ').trim().toUpperCase(); const pp=nums(ckPre(m[2]));
+      a={type:'replace',target:m[1],name:nn,price:p?p.price:(pp[0]??null),club:p?p.club:(pp[1]??null),unit:p?p.unit:null,hl:p?!!p.hl:false};
+    } else if((m=/^(?:SUBSTITUIR|TROCAR)\s+(.+?)\s+(?:POR|PELO|PELA)\s+(.+)$/i.exec(line))){
+      a={type:'replace',target:m[1],name:m[2].replace(/\s+/g,' ').trim().toUpperCase(),price:null,club:null};
     } else if((m=/^(?:TIRAR|REMOVER|RETIRAR|EXCLUIR)\s+(?!DO CLUBE)(.+)$/i.exec(line))&&!/CLUBE/i.test(line)){
       a={type:'remove',target:m[1]};
-    } else if((m=/^(?:INCLUIR|ADICIONAR|ACRESCENTAR|COLOCAR|ENTRA)\s+(.+)$/i.exec(line))){
-      const p=nums(m[1]); a={type:'add',name:m[1].replace(NUM_RX,'').replace(/[.…]{2,}|R\$/g,' ').replace(/\s+/g,' ').trim().toUpperCase(),price:p[0]??null,club:p[1]??null};
+    } else if((m=/^(?:INCLUIR|ADICIONAR|ACRESCENTAR|COLOCAR|ENTRA)\s+(.+)$/i.exec(line))&&hasNum){
+      const p=itemOf(m[1]); if(p) a={type:'add',item:p,name:p.name.toUpperCase(),price:p.price,club:p.club};
     } else if((m=/^(.+?)\s+(?:É|E)\s+(GR|G|KG|ML|L|LT)$/i.exec(line))){
       a={type:'unit',target:m[1],to:m[2].toUpperCase().replace(/^GR$/,'G').replace(/^LT$/,'L')};
-    } else if(nums(line).length){
-      const p=nums(line);
-      if(/TIRAR DO CLUBE|SEM CLUBE|SAI DO CLUBE/i.test(U)) a={type:'price',target:cleanTarget(line),price:p[0],club:null,clubSet:true};
-      else if(/CLUBE/i.test(U)&&p.length===1) a={type:'price',target:cleanTarget(line),club:p[0],clubSet:true};
-      else if(p.length>=2) a={type:'price',target:cleanTarget(line),price:p[0],club:p[1],clubSet:true};
-      else a={type:'price',target:cleanTarget(line),price:p[0]};
+    } else if(hasNum){
+      const p=nums(ckPre(line.replace(/(?<![Rr])\$\s*(?=\d)/g,''))), tgt=cleanTarget(line.replace(/\bDESTAQUE\b/i,' ').replace(/\$/g,' ')), f=findItem(tgt), prod=itemOf(line);
+      const leader=/\.{3,}|…|_{3,}/.test(line), cmd=/^(PRE[CÇ]O|VALOR|CLUBE|MUDAR|ALTERAR|AJUSTAR|CORRIGIR)\b/i.test(line);
+      if(prod&&(mode==='add'||(leader&&!cmd&&!f.best))) a={type:'add',item:prod,name:prod.name.toUpperCase(),price:prod.price,club:prod.club,guess:mode!=='add'};
+      else if(/TIRAR DO CLUBE|SEM CLUBE|SAI DO CLUBE/i.test(U)) a={type:'price',target:tgt,price:p[0],club:null,clubSet:true};
+      else if(/CLUBE/i.test(U)&&p.length===1) a={type:'price',target:tgt,club:p[0],clubSet:true};
+      else if(p.length>=2) a={type:'price',target:tgt,price:p[0],club:p[1],clubSet:true};
+      else a={type:'price',target:tgt,price:p[0]};
+      if(a.type==='price'&&/\bDESTAQUE\b/i.test(line)) a.hl=true;
+    } else if(line.split(' ').length>=2){
+      // recado solto ("Ajustar a descrição do bombom, ficou por cima do preço"): acha o produto e deixa o aviso nele
+      const tgt=line.replace(TODO_STOP,' ').replace(/[.,;:!?]+/g,' ').replace(/\s+/g,' ').trim(); const f=tgt?findItem(tgt):{cands:[]};
+      const hit=f.best||(f.cands&&f.cands[0])||null; a={type:'todo',text:line,hit}; a.line=line; a.other=other; a.header=header; acts.push(a); continue;
     }
     if(!a){ acts.push({type:'unknown',line,other}); continue; }
     a.line=line; a.other=other; a.header=header;
-    if(a.target){ const f=findItem(a.target); a.hit=f.best; if(!f.best) a.type2='notfound'; }
+    if(a.target){ const f=findItem(a.target), nq=tokens(a.target).length; a.hit=f.best&&f.best.s>=(nq<=2?0.99:0.6)?f.best:null; if(!a.hit) a.type2='notfound'; }
     acts.push(a);
   }
   return acts;
 }
 function describeAct(a){
-  const it=a.hit&&a.hit.it, nm=it?`Arte ${a.hit.gi+1} · ${it.name}`:`“${a.target||''}” (não achei na planilha)`;
+  const it=a.hit&&a.hit.it, nm=it?`Arte ${a.hit.gi+1} · ${it.name}`:`“${a.target||''}” (não achei neste trabalho)`;
   if(a.type==='unknown') return 'Não entendi — faça à mão';
-  if(a.type==='price'){ const ch=[]; if(a.price!=null) ch.push(`preço ${fmtBR(it?it.price:null)} → ${fmtBR(a.price)}`); if(a.clubSet) ch.push(a.club==null?'tirar do clube':`clube ${fmtBR(it?it.club:null)} → ${fmtBR(a.club)}`); return `${nm}: ${ch.join(', ')}`; }
+  if(a.type==='price'){ const ch=[]; if(a.price!=null) ch.push(`preço ${fmtBR(it?it.price:null)} → ${fmtBR(a.price)}`); if(a.clubSet) ch.push(a.club==null?'tirar do clube':`clube ${fmtBR(it?it.club:null)} → ${fmtBR(a.club)}`); if(a.hl) ch.push('destaque'); return `${nm}: ${ch.join(', ')}`+(a.same?' (já está assim)':''); }
   if(a.type==='replace') return `${nm} → trocar por ${a.name}${a.price!=null?' · '+fmtBR(a.price):''}${a.club!=null?' / clube '+fmtBR(a.club):''}`;
   if(a.type==='remove') return `${nm}: tirar da arte`;
-  if(a.type==='add') return `Adicionar ${a.name}${a.price!=null?' · '+fmtBR(a.price):''} (escolha a arte depois, entra na arte 1)`;
+  if(a.type==='add') return `Produto novo: ${a.name}${a.price!=null?' · '+fmtBR(a.price):''}${a.club!=null?' / clube '+fmtBR(a.club):''}${a.item&&a.item.hl?' · destaque':''}${a.guess?' (não achei na arte; se for só mudança de preço, desmarque)':''}`;
   if(a.type==='unit') return `${nm}: medida → ${a.to}`;
+  if(a.type==='validity') return `Validade → ${a.from}${a.to&&a.to!==a.from?' a '+a.to:''}`+(a.same?' (já está assim)':'');
+  if(a.type==='cities') return `Tarja → ${a.text.toUpperCase()}`+(a.same?' (já está assim)':'');
+  if(a.type==='todo') return it?`Recado, não dá para fazer sozinho: fica o aviso "a fazer" em ${nm}`:'Recado sem produto que eu reconheça — faça à mão';
 }
-let CHG_ACTS=[];
+let CHG_ACTS=[], CHG_DEST='new';
 function previewChanges(){
-  CHG_ACTS=parseChanges($('#chg-text').value);
+  const txt=$('#chg-text').value; CHG_ACTS=parseChanges(txt);
+  if(txt.trim()) IDB.set('chg.last',{text:txt,at:Date.now()}).catch(()=>{});
   const box=$('#chg-list'); box.innerHTML='';
   if(!CHG_ACTS.length){ box.append(el('div',{class:'st'},'Cole o texto da mensagem acima.')); return; }
+  const adds=CHG_ACTS.filter(a=>a.type==='add'&&!a.other);
+  if(adds.length){ if(previewChanges.n!==adds.length){ CHG_DEST=adds.length>=2?'new':'0'; previewChanges.n=adds.length; }
+    const sel=el('select',{onchange:e=>{ CHG_DEST=e.target.value; }},el('option',{value:'new'},'numa arte nova (mesmo modelo da última)'),...S.grids.map((g,gi)=>el('option',{value:String(gi)},`na arte ${gi+1} (${g.label||''})`.slice(0,60))));
+    sel.value=CHG_DEST; box.append(el('div',{class:'st',style:'margin:0 0 8px;display:flex;gap:8px;align-items:center'},el('b',{},`${adds.length} produto(s) novo(s) entram `),sel)); }
+  const curV=[padDM($('#in-from').value),padDM($('#in-to').value||$('#in-from').value)];
   CHG_ACTS.forEach((a,k)=>{
-    const ok=a.type!=='unknown'&&!a.other&&(a.type==='add'||a.hit);
+    if(a.type==='validity') a.same=padDM(a.from)===curV[0]&&padDM(a.to||a.from)===curV[1];
+    if(a.type==='price'&&a.hit){ const it=a.hit.it; a.same=(a.price==null||a.price===it.price)&&(!a.clubSet||(a.club??null)===(it.club??null))&&(!a.hl||it.hl); }
+    if(a.type==='cities') a.same=norm($('#in-cities').value).includes(norm(a.text.replace(/^OFERTAS?\s+V[AÁ]LIDAS?\s+(?:SOMENTE\s+|APENAS\s+)?(?:PARA|EM|NAS?|NOS?)\s+/i,'')));
+    const free=a.type==='add'||a.type==='validity'||a.type==='cities';
+    const ok=a.type!=='unknown'&&!a.other&&(free?!a.same:!!a.hit&&!a.same);
     a.on=ok;
-    const cb=el('input',{type:'checkbox',checked:ok,disabled:a.type==='unknown'||(!a.hit&&a.type!=='add'),onchange:e=>a.on=e.target.checked});
+    const cb=el('input',{type:'checkbox',checked:ok,disabled:a.type==='unknown'||(!a.hit&&!free),onchange:e=>a.on=e.target.checked});
     box.append(el('label',{class:'chg'+(ok?'':' off')},cb,el('div',{},el('div',{class:'cl'},a.line),el('div',{class:'cd'},(a.other?'Outra campanha ('+a.header+') — ignorado. ':'')+describeAct(a)))));
   });
 }
 function applyChanges(){
-  const touched=new Set(); let n=0;
-  for(const a of CHG_ACTS){ if(!a.on) continue;
-    if(a.type==='add'){ const g=S.grids[0]; const i=Math.max(-1,...g.items.map(x=>x.i))+1; const u=/\bKG$/i.test(a.name)?'KG':'UND';
-      const it={i,raw:a.name,raw0:'',name:a.name,unit:u,price:a.price,club:a.club,note:'',imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:'',price:null,club:null,unit:u}};
-      it.slot=freeSlot(g); g.items.push(it); autoPickImages(it); touched.add(0); n++; continue; }
-    const {gi,it}=a.hit; touched.add(gi); n++;
-    if(a.type!=='add'&&a.type!=='remove') it.cliChg=true;
-    if(a.type==='price'){ if(a.price!=null) it.price=a.price; if(a.clubSet) it.club=a.club; }
+  const touched=new Set(); let n=0, todo=0;
+  const adds=CHG_ACTS.filter(a=>a.on&&a.type==='add');
+  if(adds.length){ let gi=CHG_DEST==='new'?addGrid(null,false):+CHG_DEST; if(gi==null||!S.grids[gi]) gi=0; const g=S.grids[gi];
+    for(const a of adds){ const p=a.item, i=Math.max(-1,...g.items.map(x=>x.i))+1;
+      const it={...p,i,raw0:p.raw,name:fixAccents(p.name),imgIds:[],conf:'none',variant:'',rot:{},added:true,orig:{name:p.name,price:p.price,club:p.club,unit:p.unit}};
+      g.items.push(it); activate(g); if(!it.slot) it.slot=freeSlot(g); autoPickImages(it); n++; }
+    if(CHG_DEST==='new') g.label='ITENS NOVOS'; touched.add(gi); }
+  for(const a of CHG_ACTS){ if(!a.on||a.type==='add') continue;
+    if(a.type==='validity'){ $('#in-from').value=a.from; $('#in-to').value=a.to||a.from; for(const g of S.grids){ if(!g.bebidas){ g.gvalidity=null; g.valOwn=false; } } n++; continue; }
+    if(a.type==='cities'){ const inp=$('#in-cities'), T=TPL, up=!T||!T.band||citiesOf(T.band.text)===citiesOf(T.band.text).toUpperCase(); const base=up?a.text.toUpperCase():a.text;
+      inp.value=T&&T.band?bandText(T,base,$('#in-from').value,$('#in-to').value):base; inp.dataset.manual='1';
+      for(const g of S.grids){ const GT=tplOfGrid(g)||{}; if(GT.kind==='replay'&&g.band) g.band=a.text.toUpperCase(); } n++; continue; }
+    if(!a.hit) continue; const {gi,it}=a.hit; touched.add(gi);
+    if(a.type==='todo'){ it.todo=a.text; todo++; continue; }
+    n++;
+    if(a.type!=='remove') it.cliChg=true;
+    if(a.type==='price'){ if(a.price!=null) it.price=a.price; if(a.clubSet) it.club=a.club; if(a.hl) it.hl=true; }
     if(a.type==='remove'&&!it.removed){ it.removed=true; it.prevSlot=it.slot; it.slot=''; }
     if(a.type==='unit'){ it.name=it.name.replace(/(\d+(?:[.,]\d+)?)\s*(ML|G|GR|KG|L|LT)\b/i,(m0,v)=>v+a.to); }
-    if(a.type==='replace'){ it.name=fixAccents(a.name); it.raw=a.name; if(/\bKG$/i.test(a.name)) it.unit='KG'; if(a.price!=null) it.price=a.price; it.club=a.club; autoPickImages(it); }
+    if(a.type==='replace'){ it.name=fixAccents(a.name); it.raw=a.name; if(a.unit) it.unit=a.unit; else if(/\bKG$/i.test(a.name)) it.unit='KG'; if(a.price!=null) it.price=a.price; it.club=a.club; if(a.hl) it.hl=true; autoPickImages(it); }
   }
   if(S.src){ S.src.changes=[...(S.src.changes||[]),$('#chg-text').value]; }
   $('#changes').close();
-  buildGridUI(); renderAll(); jobChanged();
-  toast(`${n} alteração(ões) aplicada(s). Confira as artes marcadas.`);
+  buildGridUI(); renderAll(); jobChanged(); updateSaveState();
+  toast(`${n} alteração(ões) aplicada(s)`+(todo?` e ${todo} recado(s) marcado(s) como "a fazer" no produto.`:'. Confira as artes.'));
 }
 
 // [VIDEO] ---- início do bloco do chat dos vídeos (não apagar; levar para o código-fonte) ----
@@ -3819,7 +3862,7 @@ async function setGridTemplate(g,id){ const T=window.TPLS[id]; if(!T) return; g.
 async function setTemplate(id,reassign){
   const T=window.TPLS[id]; if(!T) return;
   if(T.kind!=='replay') useTemplate(tplPrepare(T)); else { TPL=T; }
-  $('#in-tpl').value=id; $('#in-out').value=T.out;
+  $('#in-tpl').value=id; outLabel();
   await ensureBases(T);
   if(reassign&&S.grids.length){ for(const g of S.grids){ g.tpl=id; g.bd=null; reassignGrid(g); } }
   autoBand();
@@ -4076,7 +4119,6 @@ function buildGridUI(){
         el('span',{class:'badge',id:'sv-'+gi}),
         el('span',{class:'sp'}),
         el('button',{class:'btn',onclick:()=>addItem(gi)},'+ Produto'),
-        canShareFiles()?el('button',{class:'btn pri',onclick:()=>shareGrids([gi])},'Compartilhar'):null,
         el('button',{class:'btn pri',onclick:()=>downloadGrid(gi)},'Baixar PNG'),
         el('button',{class:'btn del',title:'Excluir esta arte (ela some da lista e não é salva nem exportada)',onclick:()=>deleteGrid(gi)},'🗑 Excluir arte')),
       el('div',{class:'gb'},
@@ -4227,6 +4269,7 @@ async function refreshThumbs(gi){
     if(bad) issues++;
     fl.textContent= it.psPending?'aguardando Photoshop': fixedArt?'foto da arte':!it.imgIds.length?'sem imagem': (it.missing&&it.conf==='low')?'falta 2ª imagem': it.conf==='low'?'conferir': it.conf==='mem'?'salva': it.multi?'2 versões':'';
     fl.className='flag '+(bad||it.psPending?'warn':''); fl.onclick=it.psPending?(e=>{ e.stopPropagation(); pollPhotoshop(); toast('Procurando o recorte no banco…'); }):null; if(it.psPending) fl.title='Clique para procurar agora';
+    if(it.todo&&!it.psPending){ fl.textContent='a fazer: '+(it.todo.length>64?it.todo.slice(0,62)+'…':it.todo); fl.className='flag warn'; fl.title='Recado do cliente: '+it.todo+' — clique aqui quando tiver feito.'; fl.onclick=e=>{ e.stopPropagation(); delete it.todo; jobChanged(); refreshThumbs(gi); }; }
     const nm=it.imgIds.map(id=>S.lib.byId.get(id)?.name||(id.startsWith('manual:')?'arquivo enviado':'')).join(' + ');
     th.title=nm;
   }
@@ -4366,11 +4409,11 @@ async function gridBlob(gi){ const g=S.grids[gi]; const c=document.createElement
 function dl(blob,name){ const a=el('a',{href:URL.createObjectURL(blob),download:name}); document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},2000); }
 // excluir uma arte inteira (ex.: arte criada a partir de uma linha que não é produto); dá para desfazer
 // arte extra no mesmo trabalho: copia modelo, tarja, validade e ajustes de letra da arte de referência (a última) e começa com um produto em branco
-function addGrid(from){
+function addGrid(from,blank){
   const src=S.grids[from!=null?from:S.grids.length-1]; if(!src) return;
   const g={label:'ARTE EXTRA',items:[],cities:src.cities||'',bebidas:!!src.bebidas,gvalidity:src.gvalidity?{...src.gvalidity}:null,validity:src.validity?{...src.validity}:{from:'',to:''},
     tpl:src.tpl,kind:src.kind||null,band:src.band||'',bandOwn:!!src.bandOwn,valOwn:!!src.valOwn,bd:null,title:src.title||'',nameCase:src.nameCase,nameSize:src.nameSize,priceSize:src.priceSize,ink:src.ink,seal:null,dayText:src.dayText||null,pins:{},stk:[],extra:true};
-  S.grids.push(g); const gi=S.grids.length-1; OPEN.clear(); buildGridUI(); addItem(gi); renderAll(); jobChanged(); updateSaveState();
+  S.grids.push(g); const gi=S.grids.length-1; OPEN.clear(); buildGridUI(); if(blank!==false) addItem(gi); renderAll(); jobChanged(); updateSaveState(); if(blank===false) return gi;
   setTimeout(()=>{ const c=$('#grid-'+gi); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },80);
   toast(`Arte ${gi+1} criada com o mesmo modelo da anterior. Inclua os produtos pelo "+ Produto".`);
 }
@@ -4387,32 +4430,43 @@ async function downloadAll(){
   for(let gi=0;gi<S.grids.length;gi++){ dl(await gridBlob(gi),artFileName(gi)); await new Promise(r=>setTimeout(r,450)); }
   toast(`${S.grids.length} arte(s) baixada(s) em PNG.`);
 }
-async function downloadGrid(gi){ const T=tplOfGrid(S.grids[gi]); dl(await gridBlob(gi),`${T.id.replace('_','-')}-arte-${gi+1}.png`); }
+async function downloadGrid(gi){ dl(await gridBlob(gi),artFileName(gi)); }
+// ---- pasta das artes prontas (Google Drive "Ofertas Mercados") ----
+async function outRoot(pick){ let d=null; if(!pick){ try{ d=await IDB.get('dir.out'); if(d&&await d.queryPermission({mode:'readwrite'})!=='granted'&&await d.requestPermission({mode:'readwrite'})!=='granted') d=null; }catch(e){ d=null; } }
+  if(!d){ if(!pick) toast('Escolha a pasta "Ofertas Mercados" do Google Drive (só na primeira vez).'); d=await window.showDirectoryPicker({id:'ofertas-mercados',mode:'readwrite'}); await IDB.set('dir.out',d); }
+  outRoot.dirName=d.name; return d; }
+function outInfo(gi){ const g=S.grids[gi]; let T=tplOfGrid(g)||TPL||{};
+  if(T.hidden){ for(const V of Object.values(window.TPLS)){ if(!V.hidden&&(V.more===T.id||(V.byCount&&Object.values(V.byCount).includes(T.id)))){ T=V; break; } } }
+  const clean=x=>safeFileName(String(x||'').replace(/\s*\([^)]*\)\s*$/,'').replace(/\s*\/\s*/g,' e '));
+  const offer=clean(T.name)||'Oferta', client=clean(T.client)||'Outros';
+  const from=padDM((g.gvalidity&&g.gvalidity.from)||$('#in-from').value), to=padDM((g.gvalidity&&g.gvalidity.to)||$('#in-to').value);
+  const ok=/^\d{2}\/\d{2}/.test(from), d=ok?dateOf(from):null, f=x=>x.slice(0,5).replace('/','-');
+  const range=ok?(/^\d{2}\/\d{2}/.test(to)&&to.slice(0,5)!==from.slice(0,5)?`${f(from)} a ${f(to)}`:f(from)):'';
+  return {parts:[client,ok?`${d.getFullYear()}-${from.slice(3,5)}-${from.slice(0,2)} ${offer} (${range})`:`sem data ${offer}`],base:range?`${offer} ${range}`:offer}; }
+function needsSave(gi){ const g=S.grids[gi]; if(!g.savedAs||g.savedSig!==sigOf(g)) return true;
+  if(document.body.classList.contains('mobile')||!window.showDirectoryPicker) return false; return g.savedIn!==outInfo(gi).parts.join('/'); }
+async function outLabel(){ const inp=$('#in-out'); if(!inp) return; let nm=outRoot.dirName; if(!nm){ try{ const d=await IDB.get('dir.out'); nm=d&&d.name; if(nm) outRoot.dirName=nm; }catch(e){} }
+  const ex=S.grids.length?outInfo(0).parts.join(' › '):'Cliente › data e oferta'; inp.value=nm?`${nm} › ${ex}`:'ainda não escolhida — clique aqui e aponte para a pasta "Ofertas Mercados"'; }
 async function saveAll(){
   if(!S.grids.length) return;
-  const todo=S.grids.map((g,gi)=>gi).filter(gi=>!S.grids[gi].savedAs||S.grids[gi].savedSig!==sigOf(S.grids[gi]));
+  const todo=S.grids.map((g,gi)=>gi).filter(gi=>needsSave(gi));
   if(!todo.length){ toast('Todas as artes já estão salvas.'); return; }
-  if(S.dir){
-    try{
-      if(await S.dir.queryPermission({mode:'readwrite'})!=='granted' && await S.dir.requestPermission({mode:'readwrite'})!=='granted') throw new Error('sem permissão');
-      const dirs={}; const done=[];
-      const dirFor=async(path)=>{ if(dirs[path]) return dirs[path]; let d=S.dir; for(const part of path.split(/[\\/]/).filter(Boolean)) d=await d.getDirectoryHandle(part,{create:true});
-        let max=0, pre=''; for await (const [n,h] of d.entries()){ const m=/^(.*?)(\d+)\.(png|psd|jpe?g)$/i.exec(n); if(m&&+m[2]<100000){ if(+m[2]>max){ max=+m[2]; pre=m[1]; } } }
-        return dirs[path]={d,max,pre}; };
-      for(const gi of todo){ const g=S.grids[gi]; const T=tplOfGrid(g); const path=(S.grids.every(x=>x.tpl===g.tpl)&&$('#in-out').value)||T.out; const D=await dirFor(path); const d=D.d; const n=g.savedAs||`${D.pre}${++D.max}.png`; const fh=await d.getFileHandle(n,{create:true}); const w=await fh.createWritable(); await w.write(await gridBlob(gi)); await w.close(); g.savedAs=n; g.savedSig=sigOf(g); done.push(path.split('/').pop()+'/'+n); }
-      try{ const fh=await S.dir.getFileHandle(S.sheetName.replace(/\.xlsx$/i,'')+'.gerador.json',{create:true}); const w=await fh.createWritable(); await w.write(JSON.stringify(jobSnapshot())); await w.close(); }catch(e){}
-      jobChanged(); updateSaveState(); toast(`Salvo: ${done.join(', ')}`); return;
-    }catch(e){ toast('Não consegui salvar na pasta ('+e.message+'). Vou baixar os arquivos.','err'); }
-  }
-  // computador sem a pasta ELEMENTOS aberta: salva os PNG numa pasta escolhida (lembrada para as próximas vezes)
+  // computador: grava na pasta "Ofertas Mercados" (Google Drive):  Cliente / AAAA-MM-DD Oferta (validade) / Oferta validade - N.png
   if(!document.body.classList.contains('mobile')&&window.showDirectoryPicker){
-    let d=null; try{ d=await IDB.get('dir.save'); if(d&&await d.requestPermission({mode:'readwrite'})!=='granted') d=null; }catch(e){ d=null; }
-    if(!d){ try{ d=await window.showDirectoryPicker({id:'salvar-artes',mode:'readwrite',startIn:'pictures'}); await IDB.set('dir.save',d); }catch(e){ if(e.name!=='AbortError') toast(e.message,'err'); return; } }
-    const done=[];
-    try{ for(const gi of todo){ const g=S.grids[gi]; const n=g.savedAs||artFileName(gi); const fh=await d.getFileHandle(n,{create:true}); const w=await fh.createWritable(); await w.write(await gridBlob(gi)); await w.close(); g.savedAs=n; g.savedSig=sigOf(g); done.push(n); } }
-    catch(e){ toast('Não consegui salvar na pasta: '+e.message,'err'); }
-    jobChanged(); updateSaveState();
-    if(done.length) toastAction(`Salvo em "${d.name}": ${done.join(', ')}`,'Trocar pasta',async()=>{ await IDB.del('dir.save'); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); toast('Clique em Salvar de novo e escolha a nova pasta.'); });
+    let root=null; try{ root=await outRoot(false); }catch(e){ if(e.name!=='AbortError') toast('Não consegui abrir a pasta: '+e.message,'err'); return; }
+    const done=[], dirs={};
+    const walk=async(parts,create)=>{ let d=root; for(const p of parts) d=await d.getDirectoryHandle(p,{create:!!create}); return d; };
+    const dirFor=async(parts)=>{ const key=parts.join('/'); if(dirs[key]) return dirs[key]; const d=await walk(parts,true);
+      let max=0; for await (const [n] of d.entries()){ const m=/ - (\d+)\.png$/i.exec(n); if(m) max=Math.max(max,+m[1]); } return dirs[key]={d,max}; };
+    try{ for(const gi of todo){ const g=S.grids[gi], o=outInfo(gi), key=o.parts.join('/'), D=await dirFor(o.parts);
+        const same=g.savedIn===key&&g.savedAs;                    // alteração: grava por cima do mesmo arquivo
+        const n=same?g.savedAs:`${o.base} - ${++D.max}.png`;
+        const fh=await D.d.getFileHandle(n,{create:true}); const w=await fh.createWritable(); await w.write(await gridBlob(gi)); await w.close();
+        if(!same&&g.savedIn&&g.savedAs){ try{ const ps=g.savedIn.split('/'); const od=await walk(ps); await od.removeEntry(g.savedAs); let vazio=true; for await (const x of od.entries()){ vazio=false; break; } if(vazio){ const up=await walk(ps.slice(0,-1)); await up.removeEntry(ps[ps.length-1]); } }catch(e){} }   // mudou a validade ou o modelo: o arquivo sai da pasta antiga
+        g.savedAs=n; g.savedIn=key; g.savedSig=sigOf(g); done.push(o.parts.join(' › ')+' › '+n); } }
+    catch(e){ console.error(e); toast('Não consegui salvar na pasta: '+e.message,'err'); }
+    jobChanged(); updateSaveState(); outLabel();
+    if(done.length) toastAction(`Salvo em "${root.name}": ${done.length===1?done[0]:done.length+' artes — '+done[0].split(' › ').slice(0,2).join(' › ')+(new Set(done.map(x=>x.split(' › ').slice(0,2).join('/'))).size>1?' e outras pastas':'')}`,'Trocar pasta',async()=>{ try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta trocada. Clique em Salvar artes para gravar nela.'); }catch(e){} });
     return;
   }
   if(document.body.classList.contains('mobile')&&canShareFiles()){ // celular: manda as artes direto (WhatsApp etc.)
@@ -4487,10 +4541,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
     S.grids.forEach((g,gi)=>{ const m=$('#grid-'+gi+' .gmeta'); if(m) m.replaceWith(gridMetaUI(gi)); });   // Proner/Bigolin/Destak: the fixed "tarja" goes to every art without its own
     renderSoon(); });
-  $('#btn-save').onclick=saveAll; $('#btn-dlall').onclick=downloadAll; $('#btn-addgrid').onclick=()=>addGrid(); $('#btn-video').onclick=()=>sendToVideo();
+  $('#btn-save').onclick=saveAll; $('#in-out').onclick=async()=>{ try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta escolhida. As artes prontas vão ser gravadas nela.'); }catch(e){} }; outLabel(); $('#btn-dlall').onclick=downloadAll; $('#btn-addgrid').onclick=()=>addGrid(); $('#btn-video').onclick=()=>sendToVideo();
   $('#file-rev').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(!S.grids.length){ toast('Abra primeiro a planilha original.','err'); return; } if(f) applyRevision(f); };
   $('#rev-close').onclick=()=>$('#revision').close();
-  $('#btn-chg').onclick=()=>{ if(!S.grids.length){ toast('Abra primeiro a planilha.','err'); return; } $('#chg-text').value=''; $('#chg-list').innerHTML=''; $('#changes').showModal(); $('#chg-text').focus(); };
+  $('#btn-chg').onclick=()=>{ if(!S.grids.length){ toast('Abra primeiro a planilha.','err'); return; } $('#chg-text').value=''; $('#chg-list').innerHTML=''; previewChanges.n=null; $('#changes').showModal(); $('#chg-text').focus();
+    IDB.get('chg.last').then(v=>{ if(v&&v.text&&Date.now()-v.at<3*864e5&&!$('#chg-text').value) $('#chg-list').append(el('button',{class:'lnk',onclick:()=>{ $('#chg-text').value=v.text; previewChanges(); }},`Usar de novo o último texto colado (${new Date(v.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}): “${v.text.trim().slice(0,60)}…”`)); }).catch(()=>{}); };
   $('#chg-text').oninput=()=>{ clearTimeout(previewChanges.t); previewChanges.t=setTimeout(previewChanges,250); };
   $('#chg-cancel').onclick=()=>$('#changes').close();
   $('#chg-apply').onclick=applyChanges;
