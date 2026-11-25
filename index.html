@@ -270,7 +270,7 @@ body.bankmode main{display:none} body.bankmode #bankview{display:block}
         <label>Válido de<input id="in-from" placeholder="dd/mm"></label>
         <label>até<input id="in-to" placeholder="dd/mm"></label>
       </div>
-      <div class="fields desk" style="grid-template-columns:1fr"><label>Artes prontas vão para (pasta do Google Drive; clique para trocar)<input id="in-out" value="" readonly style="cursor:pointer"></label></div>
+      <div class="fields desk" style="grid-template-columns:1fr"><label>Artes prontas vão para (clique para abrir a pasta no Google Drive)<input id="in-out" value="" readonly style="cursor:pointer"></label></div>
     </div>
   </div>
   <div id="grids"><div class="empty-state">Abra a pasta ELEMENTOS (ou arraste a planilha aqui) para gerar as artes.</div></div>
@@ -4432,7 +4432,12 @@ async function downloadAll(){
 }
 async function downloadGrid(gi){ dl(await gridBlob(gi),artFileName(gi)); }
 // ---- pasta das artes prontas (Google Drive "Ofertas Mercados") ----
-async function outRoot(pick){ let d=null; if(!pick){ try{ d=await IDB.get('dir.out'); if(d&&await d.queryPermission({mode:'readwrite'})!=='granted'&&await d.requestPermission({mode:'readwrite'})!=='granted') d=null; }catch(e){ d=null; } }
+async function outRoot(pick){
+  if(gdClientId()){   // direto no Google Drive: pasta "Ofertas Mercados" na raiz do Meu Drive (criada se não existir)
+    if(!gdOnline()||Date.now()>GD.exp) await gdLogin();
+    if(!outRoot.g){ const f=await gdFolder('Ofertas Mercados','root',true); outRoot.g=new GDir(f.id,f.name); }
+    outRoot.g.refresh(); outRoot.dirName='Google Drive › '+outRoot.g.name; return outRoot.g; }
+  let d=null; if(!pick){ try{ d=await IDB.get('dir.out'); if(d&&await d.queryPermission({mode:'readwrite'})!=='granted'&&await d.requestPermission({mode:'readwrite'})!=='granted') d=null; }catch(e){ d=null; } }
   if(!d){ if(!pick) toast('Escolha a pasta "Ofertas Mercados" do Google Drive (só na primeira vez).'); d=await window.showDirectoryPicker({id:'ofertas-mercados',mode:'readwrite'}); await IDB.set('dir.out',d); }
   outRoot.dirName=d.name; return d; }
 function outInfo(gi){ const g=S.grids[gi]; let T=tplOfGrid(g)||TPL||{};
@@ -4444,16 +4449,16 @@ function outInfo(gi){ const g=S.grids[gi]; let T=tplOfGrid(g)||TPL||{};
   const range=ok?(/^\d{2}\/\d{2}/.test(to)&&to.slice(0,5)!==from.slice(0,5)?`${f(from)} a ${f(to)}`:f(from)):'';
   return {parts:[client,ok?`${d.getFullYear()}-${from.slice(3,5)}-${from.slice(0,2)} ${offer} (${range})`:`sem data ${offer}`],base:range?`${offer} ${range}`:offer}; }
 function needsSave(gi){ const g=S.grids[gi]; if(!g.savedAs||g.savedSig!==sigOf(g)) return true;
-  if(document.body.classList.contains('mobile')||!window.showDirectoryPicker) return false; return g.savedIn!==outInfo(gi).parts.join('/'); }
+  if(document.body.classList.contains('mobile')||(!gdClientId()&&!window.showDirectoryPicker)) return false; return g.savedIn!==outInfo(gi).parts.join('/'); }
 async function outLabel(){ const inp=$('#in-out'); if(!inp) return; let nm=outRoot.dirName; if(!nm){ try{ const d=await IDB.get('dir.out'); nm=d&&d.name; if(nm) outRoot.dirName=nm; }catch(e){} }
-  const ex=S.grids.length?outInfo(0).parts.join(' › '):'Cliente › data e oferta'; inp.value=nm?`${nm} › ${ex}`:'ainda não escolhida — clique aqui e aponte para a pasta "Ofertas Mercados"'; }
+  const ex=S.grids.length?outInfo(0).parts.join(' › '):'Cliente › data e oferta'; inp.value=gdClientId()?`Google Drive › Ofertas Mercados › ${ex}`:nm?`${nm} › ${ex}`:'ainda não escolhida — clique aqui e aponte para a pasta "Ofertas Mercados"'; }
 async function saveAll(){
   if(!S.grids.length) return;
   const todo=S.grids.map((g,gi)=>gi).filter(gi=>needsSave(gi));
   if(!todo.length){ toast('Todas as artes já estão salvas.'); return; }
   // computador: grava na pasta "Ofertas Mercados" (Google Drive):  Cliente / AAAA-MM-DD Oferta (validade) / Oferta validade - N.png
-  if(!document.body.classList.contains('mobile')&&window.showDirectoryPicker){
-    let root=null; try{ root=await outRoot(false); }catch(e){ if(e.name!=='AbortError') toast('Não consegui abrir a pasta: '+e.message,'err'); return; }
+  if(!document.body.classList.contains('mobile')&&(gdClientId()||window.showDirectoryPicker)){
+    let root=null; try{ if(gdClientId()&&!gdOnline()) toast('Entrando no Google Drive…'); root=await outRoot(false); }catch(e){ if(e.name!=='AbortError') toast('Não consegui abrir a pasta: '+e.message,'err'); return; }
     const done=[], dirs={};
     const walk=async(parts,create)=>{ let d=root; for(const p of parts) d=await d.getDirectoryHandle(p,{create:!!create}); return d; };
     const dirFor=async(parts)=>{ const key=parts.join('/'); if(dirs[key]) return dirs[key]; const d=await walk(parts,true);
@@ -4466,7 +4471,10 @@ async function saveAll(){
         g.savedAs=n; g.savedIn=key; g.savedSig=sigOf(g); done.push(o.parts.join(' › ')+' › '+n); } }
     catch(e){ console.error(e); toast('Não consegui salvar na pasta: '+e.message,'err'); }
     jobChanged(); updateSaveState(); outLabel();
-    if(done.length) toastAction(`Salvo em "${root.name}": ${done.length===1?done[0]:done.length+' artes — '+done[0].split(' › ').slice(0,2).join(' › ')+(new Set(done.map(x=>x.split(' › ').slice(0,2).join('/'))).size>1?' e outras pastas':'')}`,'Trocar pasta',async()=>{ try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta trocada. Clique em Salvar artes para gravar nela.'); }catch(e){} });
+    if(done.length){ const resumo=done.length===1?done[0]:done.length+' artes — '+done[0].split(' › ').slice(0,2).join(' › ')+(new Set(done.map(x=>x.split(' › ').slice(0,2).join('/'))).size>1?' e outras pastas':'');
+      if(root instanceof GDir){ let fid=root.id; try{ const o=outInfo(todo[0]); fid=(await walk(o.parts)).id||root.id; }catch(e){}
+        toastAction(`Salvo no Google Drive › ${root.name}: ${resumo}`,'Abrir no Drive',()=>window.open('https://drive.google.com/drive/folders/'+fid,'_blank')); }
+      else toastAction(`Salvo em "${root.name}": ${resumo}`,'Trocar pasta',async()=>{ try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta trocada. Clique em Salvar artes para gravar nela.'); }catch(e){} }); }
     return;
   }
   if(document.body.classList.contains('mobile')&&canShareFiles()){ // celular: manda as artes direto (WhatsApp etc.)
@@ -4541,7 +4549,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     else S.grids.forEach((g,gi)=>{ const T=tplOfGrid(g); if(T&&T.kind==='replay'&&!g.bandOwn){ g.band=$('#in-cities').value.trim(); } });
     S.grids.forEach((g,gi)=>{ const m=$('#grid-'+gi+' .gmeta'); if(m) m.replaceWith(gridMetaUI(gi)); });   // Proner/Bigolin/Destak: the fixed "tarja" goes to every art without its own
     renderSoon(); });
-  $('#btn-save').onclick=saveAll; $('#in-out').onclick=async()=>{ try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta escolhida. As artes prontas vão ser gravadas nela.'); }catch(e){} }; outLabel(); $('#btn-dlall').onclick=downloadAll; $('#btn-addgrid').onclick=()=>addGrid(); $('#btn-video').onclick=()=>sendToVideo();
+  $('#btn-save').onclick=saveAll; $('#in-out').onclick=async()=>{ if(gdClientId()){ try{ const r=await outRoot(false); window.open('https://drive.google.com/drive/folders/'+r.id,'_blank'); }catch(e){ toast('Não consegui entrar no Google Drive: '+e.message,'err'); } return; } try{ await outRoot(true); S.grids.forEach(g=>{ g.savedSig=null; }); updateSaveState(); outLabel(); toast('Pasta escolhida. As artes prontas vão ser gravadas nela.'); }catch(e){} }; outLabel(); $('#btn-dlall').onclick=downloadAll; $('#btn-addgrid').onclick=()=>addGrid(); $('#btn-video').onclick=()=>sendToVideo();
   $('#file-rev').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(!S.grids.length){ toast('Abra primeiro a planilha original.','err'); return; } if(f) applyRevision(f); };
   $('#rev-close').onclick=()=>$('#revision').close();
   $('#btn-chg').onclick=()=>{ if(!S.grids.length){ toast('Abra primeiro a planilha.','err'); return; } $('#chg-text').value=''; $('#chg-list').innerHTML=''; previewChanges.n=null; $('#changes').showModal(); $('#chg-text').focus();
