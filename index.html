@@ -133,7 +133,12 @@ dialog h3{font-size:16px}
 #toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:9} .toast{background:#2a2c31;border:1px solid var(--line2);color:var(--ink);padding:10px 14px;border-radius:11px;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.5)} .toast.err{background:#3a1d1b;border-color:rgba(255,107,94,.5)}
 .tbtn{margin-left:8px;background:var(--or);color:#fff;border:0;border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit}
 #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--mut);font-size:16px;z-index:10}
-.jsearch{width:100%;margin:2px 0 8px;padding:9px 11px} .jren{flex:1;width:100%;font-weight:700} .jobrow[hidden]{display:none!important} .jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsearch{width:100%;margin:2px 0 8px;padding:9px 11px}
+.jcrumb{margin:2px 0 10px;font-size:14px}.jcrumb .st{font-size:12.5px}
+.jcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.jcard{display:flex;flex-direction:column;gap:4px;text-align:left;padding:14px 16px;border:1px solid var(--line2);border-radius:12px;background:var(--card2);color:var(--ink);font:inherit;cursor:pointer}
+.jcard:hover{border-color:var(--or)}.jcard b{font-size:16px}
+.jmonth{margin:12px 0 0;padding:4px 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--or2);border-bottom:1px solid var(--line)} .jren{flex:1;width:100%;font-weight:700} .jobrow[hidden]{display:none!important} .jobrow{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.jobrow .ji{flex:1;min-width:0}.jobrow .ji b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:#2c2e33;border-radius:10px;border:2px solid var(--bg)} ::-webkit-scrollbar-track{background:transparent}
 body.mobile .desk,body.nofs .desk{display:none!important}
 .btn.del{color:var(--bad);border-color:rgba(255,107,94,.35)} .btn.del:hover{background:var(--badbg)}
@@ -3351,7 +3356,7 @@ async function jobsFromDir(){
   const hs=[]; for await (const [n,h] of JOBS.dir.entries()) if(h.kind==='file'&&/\.json$/i.test(n)&&!n.startsWith('_')) hs.push(h);
   for(const h of hs) if(!h._mod){ try{ h._mod=(await h.getFile()).lastModified; }catch(e){ h._mod=0; } }
   hs.sort((a,b)=>b._mod-a._mod);
-  const out=await Promise.all(hs.slice(0,40).map(async h=>{ try{ const j=await readJson(h); return j&&j.grids?['drive:'+h.name,j]:null; }catch(e){ return null; } }));
+  const out=await Promise.all(hs.slice(0,150).map(async h=>{ try{ const j=await readJson(h); return j&&j.grids?['drive:'+h.name,j]:null; }catch(e){ return null; } }));
   return out.filter(Boolean);
 }
 // pasta "Ofertas anteriores" escolhida no computador (G:\Meu Drive\Ofertas anteriores) — para a versão aberta como arquivo
@@ -3404,7 +3409,7 @@ function sigOf(g){
     g.items.filter(i=>i.slot&&!i.removed).map(i=>[i.slot,i.name,i.unit,i.price,i.club,i.note,i.imgIds,i.rot,i.variant,i.adj,i.iadj,i.namePos,i.sh,i.hlt,i.hadj]).sort(), g.nameCase, g.nameSize ]);
 }
 function itemState(i){ const {cands,conf,multi,missing,...rest}=i; return {...rest,conf,multi,missing}; }
-function jobSnapshot(){ return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
+function jobSnapshot(){ const CR=JOB.created||(JOB.created={}); return {v:4,tpl:TPL&&TPL.id,sheet:S.sheetName,title:S.jobTitle||'',at:Date.now(),created:CR[S.sheetName]||(CR[S.sheetName]=Date.now()),src:S.src||null,ckIgnore:S.ckIgnore||[],cities:$('#in-cities').value,citiesOff:!!($('#in-cities').dataset.manual&&!$('#in-cities').value.trim()),from:$('#in-from').value,to:$('#in-to').value,
   grids:S.grids.map(g=>({label:g.label,extra:!!g.extra,form:g.form||0,tpl:g.tpl||null,kind:g.kind||null,bd:g.bd||null,nameCase:g.nameCase||null,nameSize:g.nameSize||null,priceSize:g.priceSize||null,ink:g.ink||null,seal:g.seal||null,dayText:g.dayText||null,pins:g.pins||null,stk:g.stk||null,savedAs:g.savedAs||null,savedSig:g.savedSig||null,
     band:g.band||'',bandOwn:!!g.bandOwn,valOwn:!!g.valOwn,title:g.title||'',gvalidity:g.gvalidity||null,bebidas:!!g.bebidas,cities:g.cities||'',validity:g.validity||null,items:g.items.map(itemState)}))}; }
 // ---- trabalhos anteriores: reabrir sem a planilha (tudo fica guardado no navegador) ----
@@ -3420,28 +3425,75 @@ async function openJobsDialog(){
   box.append(el('div',{class:'st',style:'margin-bottom:6px'},JOBS.dir?`Guardados em "${JOBS.dir.name}"${JOBS.dir instanceof GDir?' (Google Drive)':''} e neste navegador.`:'Guardados só neste navegador. ',
     JOBS.dir?null:(window.showDirectoryPicker?el('button',{class:'lnk',onclick:pickJobsFolder},'Guardar também numa pasta do Google Drive (G:\\Meu Drive\\Ofertas anteriores)'):el('button',{class:'lnk',onclick:()=>{ $('#jobs').close(); googleConnect(); }},'Entrar com Google para ver os trabalhos do Drive'))));
   if(!jobs.length){ box.append(el('div',{class:'st'},'Nenhum trabalho guardado ainda.')); return; }
-  const q=el('input',{class:'jsearch',placeholder:'Buscar pelo nome…',oninput:()=>{ const ws=norm(q.value).split(/\s+/).filter(Boolean); let n=0; box.querySelectorAll('.jobrow').forEach(r=>{ const t=norm(r.dataset.n); r.hidden=!ws.every(w=>t.includes(w)); if(!r.hidden) n++; }); nf.hidden=n>0; }});
-  const nf=el('div',{class:'st',hidden:true},'Nenhum trabalho com esse nome.');
-  box.append(q,nf); setTimeout(()=>q.focus(),50);
-  for(const [k,j] of jobs.slice(0,80)){
-    const sheet=k.slice(4), title=j.title||'';
+  // ---- organização: cliente › modelo (campanha) › trabalhos, do mais novo para o mais antigo pela data em que foram feitos ----
+  const baseTpl=id=>{ const T=window.TPLS[id]; if(!T) return null; if(!T.hidden) return T;
+    for(const V of Object.values(window.TPLS)){ if(V.hidden) continue; if(V.more===id||(V.byCount&&Object.values(V.byCount).includes(id))) return V; }
+    return window.TPLS[id.replace(/(_\d+|\d+)$/,'')]||T; };
+  const made=j=>j.created||j.at||0, dfmt=t=>t?new Date(t).toLocaleString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  const day=t=>t?new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+  const J=jobs.map(([k,j])=>{ let ids=[...new Set((j.grids||[]).map(g=>g.tpl).filter(Boolean))]; if(!ids.length&&j.tpl) ids=[j.tpl];
+    const ts=[...new Set(ids.map(baseTpl).filter(Boolean))]; return {k,j,ts,clients:[...new Set(ts.map(t=>t.client||'Outros'))]}; });
+  for(const o of J) if(!o.ts.length){ o.clients=['Outros']; }
+  const NAV=openJobsDialog.nav||(openJobsDialog.nav={client:null,tpl:null});
+  const q=el('input',{class:'jsearch',placeholder:'Buscar em todos os clientes: nome, cliente, modelo, data…',oninput:()=>draw()});
+  const crumb=el('div',{class:'jcrumb'}), list=el('div',{});
+  box.append(q,crumb,list); setTimeout(()=>q.focus(),50);
+  const rowOf=o=>{ const k=o.k, j=o.j, sheet=k.slice(4); let title=j.title||'';
     const rename=()=>{ const inp=el('input',{class:'jren',value:title||'',placeholder:'Nome desta oferta'});
-      const save=async()=>{ const v=inp.value.trim(); j.title=v; await IDB.set('job:'+sheet,j); if(JOBS.dir){ try{ await writeJson(JOBS.dir,jobFile(sheet),j); }catch(e){} }
-        if(S.sheetName===sheet){ S.jobTitle=v; $('#in-jobname').value=v; } nm.textContent=v||sheet; row.dataset.n=(v||'')+' '+sheet; inp.replaceWith(nm); };
+      const save=async()=>{ const v=inp.value.trim(); title=v; j.title=v; await IDB.set('job:'+sheet,j); if(JOBS.dir){ try{ await writeJson(JOBS.dir,jobFile(sheet),j); }catch(e){} }
+        if(S.sheetName===sheet){ S.jobTitle=v; $('#in-jobname').value=v; } nm.textContent=v||sheet; inp.replaceWith(nm); };
       inp.onkeydown=e=>{ if(e.key==='Enter') save(); if(e.key==='Escape') inp.replaceWith(nm); }; inp.onblur=save; nm.replaceWith(inp); inp.focus(); inp.select(); };
     const nm=el('b',{title:'Clique para renomear',style:'cursor:text',onclick:rename},title||sheet);
     const n=j.grids.reduce((a,g)=>a+g.items.filter(i=>!i.removed).length,0);
     const files=j.grids.map(g=>g.savedAs).filter(Boolean);
-    const row=el('div',{class:'jobrow','data-n':[title,sheet,j.from,j.to,...files].filter(Boolean).join(' ')},
-      el('div',{class:'ji'},nm,title?el('div',{class:'st'},sheet):null,el('div',{class:'st'},`${new Date(j.at).toLocaleString('pt-BR')} · ${j.grids.length} arte(s) · ${n} produtos${j.from?` · validade ${j.from}${j.to&&j.to!==j.from?' a '+j.to:''}`:''}`),
+    const where=o.clients.join(', ')+' › '+(o.ts.map(t=>t.name).join(', ')||'sem modelo');
+    const ch=j.at&&day(j.at)!==day(made(j))?` · alterado em ${day(j.at)}`:'';
+    const row=el('div',{class:'jobrow'},
+      el('div',{class:'ji'},nm,title?el('div',{class:'st'},sheet):null,
+        el('div',{class:'st'},el('b',{style:'display:inline;color:var(--ink)'},'Feito em '+dfmt(made(j))),ch),
+        el('div',{class:'st'},`${(!NAV.tpl||q.value.trim())?where+' · ':''}${j.grids.length} arte(s) · ${n} produtos${j.from?` · validade ${j.from}${j.to&&j.to!==j.from?' a '+j.to:''}`:''}`),
         files.length?el('div',{class:'st'},'Salvas como: '+files.join(', ')):null),
       el('button',{class:'btn',onclick:rename},'Renomear'),
       el('button',{class:'btn pri',onclick:async()=>{ $('#jobs').close(); try{ await openSavedJob(k.slice(4),j); }catch(e){ console.error(e); toast('Não consegui abrir: '+e.message,'err'); } }},'Abrir'),
-      el('button',{class:'lnk rm',title:'Tirar da lista (as artes já salvas não são apagadas)',onclick:async()=>{ await IDB.del(k); if(JOBS.dir){ try{ await JOBS.dir.removeEntry(jobFile(k.slice(4))); }catch(e){} } row.remove(); }},'✕'));
-    box.append(row);
+      el('button',{class:'lnk rm',title:'Tirar da lista (as artes já salvas não são apagadas)',onclick:async()=>{ await IDB.del(k); if(JOBS.dir){ try{ await JOBS.dir.removeEntry(jobFile(k.slice(4))); }catch(e){} } J.splice(J.indexOf(o),1); draw(); }},'✕'));
+    return row; };
+  const textOf=o=>norm([o.j.title,o.k.slice(4),o.j.from,o.j.to,dfmt(made(o.j)),...o.clients,...o.ts.map(t=>t.name),...(o.j.grids||[]).flatMap(g=>[g.label,g.title,g.savedAs])].filter(Boolean).join(' '));
+  const card=(name,items,sub,go)=>{ const last=Math.max(...items.map(o=>made(o.j)));
+    return el('button',{class:'jcard',onclick:go},el('b',{},name),el('span',{class:'st'},`${items.length} ${items.length===1?'trabalho':'trabalhos'}${sub?' · '+sub:''}`),el('span',{class:'st'},'último feito em '+day(last))); };
+  const ORDER=['Shop Estok','Iguatemi','Bigolin','Destak','Proner'];
+  function draw(){
+    list.innerHTML=''; crumb.innerHTML='';
+    const ws=norm(q.value).split(/\s+/).filter(Boolean);
+    const sorted=a=>a.slice().sort((x,y)=>made(y.j)-made(x.j));
+    if(ws.length){ const hit=sorted(J.filter(o=>{ const t=textOf(o); return ws.every(w=>t.includes(w)); }));
+      crumb.append(el('span',{class:'st'},`${hit.length} ${hit.length===1?'trabalho encontrado':'trabalhos encontrados'} em todos os clientes`));
+      if(!hit.length) list.append(el('div',{class:'st'},'Nenhum trabalho com esse nome.')); for(const o of hit.slice(0,200)) list.append(rowOf(o)); return; }
+    const lk=(t,fn)=>el('button',{class:'lnk',onclick:fn},t);
+    if(!NAV.client){
+      crumb.append(el('b',{},'Clientes'));
+      const cs=[...new Set(J.flatMap(o=>o.clients))].sort((a,b)=>((ORDER.indexOf(a)+1)||99)-((ORDER.indexOf(b)+1)||99)||a.localeCompare(b));
+      const wrap=el('div',{class:'jcards'}); for(const c of cs){ const it=J.filter(o=>o.clients.includes(c)); const nt=new Set(it.flatMap(o=>o.ts.filter(t=>(t.client||'Outros')===c).map(t=>t.id))).size;
+        wrap.append(card(c,it,nt>1?nt+' modelos':'',()=>{ NAV.client=c; NAV.tpl=null; draw(); })); }
+      list.append(wrap);
+      const rec=sorted(J).slice(0,5); list.append(el('div',{class:'st',style:'margin:14px 0 2px'},'Últimos feitos')); for(const o of rec) list.append(rowOf(o));
+      return; }
+    const inC=J.filter(o=>o.clients.includes(NAV.client));
+    if(!inC.length){ NAV.client=null; NAV.tpl=null; return draw(); }
+    if(!NAV.tpl){
+      crumb.append(lk('Clientes',()=>{ NAV.client=null; draw(); }),' › ',el('b',{},NAV.client));
+      const ts=new Map(); for(const o of inC){ const mine=o.ts.filter(t=>(t.client||'Outros')===NAV.client); for(const t of (mine.length?mine:[{id:'?',name:'Sem modelo'}])){ if(!ts.has(t.id)) ts.set(t.id,{t,it:[]}); ts.get(t.id).it.push(o); } }
+      const wrap=el('div',{class:'jcards'}); for(const {t,it} of [...ts.values()].sort((a,b)=>Math.max(...b.it.map(o=>made(o.j)))-Math.max(...a.it.map(o=>made(o.j))))) wrap.append(card(t.name,it,'',()=>{ NAV.tpl=t.id; draw(); }));
+      list.append(wrap); return; }
+    const inT=sorted(inC.filter(o=>NAV.tpl==='?'?!o.ts.some(t=>(t.client||'Outros')===NAV.client):o.ts.some(t=>t.id===NAV.tpl)));
+    if(!inT.length){ NAV.tpl=null; return draw(); }
+    const tn=NAV.tpl==='?'?'Sem modelo':(window.TPLS[NAV.tpl]||{}).name||NAV.tpl;
+    crumb.append(lk('Clientes',()=>{ NAV.client=null; NAV.tpl=null; draw(); }),' › ',lk(NAV.client,()=>{ NAV.tpl=null; draw(); }),' › ',el('b',{},tn),el('span',{class:'st'},`  ·  ${inT.length} ${inT.length===1?'trabalho':'trabalhos'}, do mais novo para o mais antigo`));
+    let mo=''; for(const o of inT){ const m=new Date(made(o.j)).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); if(m!==mo){ mo=m; list.append(el('div',{class:'jmonth'},m)); } list.append(rowOf(o)); }
   }
+  draw();
 }
 async function openSavedJob(name,job){
+  (JOB.created||(JOB.created={}))[name]=job.created||job.at||Date.now();
   S.sheet=null; S.sheetName=name; S.src=job.src||null; S.ckIgnore=job.ckIgnore||[]; CK.byRow=new Map(); S.jobTitle=job.title||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   const T0=window.TPLS[job.tpl]||window.TPLS[(job.grids[0]||{}).tpl]||tplList()[0];
   await setTemplate(T0.id);
@@ -3853,7 +3905,7 @@ async function loadPastedText(text,forced){
 async function applySheet(sh,name,replayFile,forced,reload){
   if(!sh.grids.length) throw new Error('Não encontrei produtos com preço no arquivo.');
   S.sheet=sh; S.sheetName=name; setSource(sh.srcLines,{cities:sh.cities||'',validity:sh.validity||null}); S.ckIgnore=[]; CK.byRow=new Map();
-  const job0=await IDB.get('job:'+name);
+  const job0=await IDB.get('job:'+name); if(job0) (JOB.created||(JOB.created={}))[name]=job0.created||job0.at||Date.now();
   S.jobTitle=(job0&&job0.title)||''; { const jn=$('#in-jobname'); jn.value=S.jobTitle; jn.disabled=false; }
   let T0;
   if(replayFile){
