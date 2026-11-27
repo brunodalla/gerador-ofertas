@@ -1260,6 +1260,8 @@ function tplPrepare(T){
 }
 function similar(a,b){ const p=parseInt(a.slice(1),16), q=parseInt(b.slice(1),16); const d=Math.abs((p>>16)-(q>>16))+Math.abs(((p>>8)&255)-((q>>8)&255))+Math.abs((p&255)-(q&255)); return d<60; }
 function layoutCells(T,present,colors){
+  // "mesma cor" aqui é bem estrito: branco e cinza-claro do modelo (#fefefe / #ececec) são cores diferentes
+  const near=(a,b)=>{ const p=parseInt(a.slice(1),16), q=parseInt(b.slice(1),16); return Math.abs((p>>16)-(q>>16))+Math.abs(((p>>8)&255)-((q>>8)&255))+Math.abs((p&255)-(q&255))<30; };
   const keys=Object.keys(T.slots);
   const base={}; for(const k of keys) base[k]=colors[k]||'#ffffff';
   if(keys.every(s=>present.has(s))){ const cells={}; for(const k of keys){ cells[k]={...cellOf(T,T.slots[k].units),color:base[k]}; } return {cells,custom:false}; }
@@ -1269,6 +1271,12 @@ function layoutCells(T,present,colors){
   const isRect=us=>{ const rs=us.map(u=>u[0]), cs=us.map(u=>u[1]); return us.length===(Math.max(...rs)-Math.min(...rs)+1)*(Math.max(...cs)-Math.min(...cs)+1); };
   let free=[]; for(let r=0;r<R;r++) for(let c=0;c<C;c++) if(!taken([r,c])) free.push([r,c]);
   const growers=Object.keys(own).filter(s=>!T.hl.includes(s));
+  // sobrou espaço só ao lado de um destaque, na(s) mesma(s) linha(s): o destaque estica de fora a fora
+  for(const s of Object.keys(own).filter(k=>T.hl.includes(k))){
+    const rs=[...new Set(own[s].map(u=>u[0]))]; const rest=[]; let ok=true;
+    for(const r of rs) for(let c=0;c<C;c++){ if(own[s].some(x=>x[0]===r&&x[1]===c)) continue; if(free.some(f=>f[0]===r&&f[1]===c)) rest.push([r,c]); else ok=false; }
+    if(ok&&rest.length){ own[s]=own[s].concat(rest); free=free.filter(f=>!rest.some(x=>x[0]===f[0]&&x[1]===f[1])); }
+  }
   for(let pass=0;pass<6&&free.length;pass++){
     free=free.filter(u=>{
       const adj=growers.map(s=>{ let v=0,h=0; for(const x of own[s]){ if(x[1]===u[1]&&Math.abs(x[0]-u[0])===1) v=1; if(x[0]===u[0]&&Math.abs(x[1]-u[1])===1) h=1; } return {s,v,h}; }).filter(a=>a.v||a.h)
@@ -1285,16 +1293,19 @@ function layoutCells(T,present,colors){
   const ks=Object.keys(cells), nbs=Object.fromEntries(ks.map(s=>[s,ks.filter(t=>t!==s&&touch(cells[s],cells[t]))]));
   if(T.plain){ for(const s of Object.keys(cells)) cells[s].color=base[s]; return {cells,custom:true}; }
   const hlColor=base[T.hl[0]]||'#fe8800';
-  const pal=[]; for(const k of keys) if(!T.hl.includes(k)&&!pal.some(c=>similar(c,base[k]))) pal.push(base[k]);
-  const opts=[...pal.slice(0,3),hlColor];
+  const pal=[]; for(const k of keys) if(!T.hl.includes(k)&&!pal.some(c=>near(c,base[k]))) pal.push(base[k]);
+  // terceira cor neutra quando o modelo só tem duas: quadro comum não precisa pegar a cor do destaque para não repetir a do vizinho
+  const lumH=c=>{ const v=parseInt(c.slice(1),16); return ((v>>16)*0.299+((v>>8)&255)*0.587+(v&255)*0.114)/255; };
+  let extra=null; if(pal.length&&pal.length<3){ const lights=pal.filter(c=>lumH(c)>0.6).sort((a,b)=>lumH(a)-lumH(b)); if(lights.length){ const v=parseInt(lights[0].slice(1),16); extra='#'+[v>>16,(v>>8)&255,v&255].map(x=>Math.max(0,x-26).toString(16).padStart(2,'0')).join(''); if(pal.some(c=>near(c,extra))) extra=null; } }
+  const opts=[...pal.slice(0,3),...(extra?[extra]:[]),hlColor];
   const fixed=ks.filter(s=>T.hl.includes(s)), freeK=ks.filter(s=>!T.hl.includes(s));
   const col={}; for(const s of fixed) col[s]=base[s];
   let best=null,bestP=1e9;
   (function go(i){
-    if(i===freeK.length){ let p=0; for(const s of ks) for(const t of nbs[s]) if(s<t&&similar(col[s],col[t])) p+=100;
-      for(const s of freeK){ if(col[s]===hlColor&&!similar(base[s],hlColor)) p+=5; else if(!similar(col[s],base[s])) p+=1; }
+    if(i===freeK.length){ let p=0; for(const s of ks) for(const t of nbs[s]) if(s<t&&near(col[s],col[t])) p+=100;
+      for(const s of freeK){ if(col[s]===hlColor&&!similar(base[s],hlColor)) p+=60; else if(!near(col[s],base[s])) p+=(col[s]===extra?2:1); }
       if(p<bestP){ bestP=p; best={...col}; } return; }
-    for(const c of opts){ col[freeK[i]]=similar(c,base[freeK[i]])?base[freeK[i]]:c; go(i+1); if(bestP===0) return; }
+    for(const c of opts){ col[freeK[i]]=near(c,base[freeK[i]])?base[freeK[i]]:c; go(i+1); if(bestP===0) return; }
   })(0);
   Object.assign(col,best);
   for(const s of ks) cells[s].color=col[s];
